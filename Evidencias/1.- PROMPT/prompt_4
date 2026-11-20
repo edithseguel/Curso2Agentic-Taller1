@@ -1,0 +1,20 @@
+Ahora el segundo agente: el de cotizaciones de outsourcing de recursos humanos TI, asociado al blueprint `blueprint/Edith_outsourcing_ti`, hecho con CrewAI. La idea es mostrar que da igual el framework: mientras tenga la función `responder(texto, context_id)`, el servidor de `src/comun` lo expone igual.
+
+CrewAI y LangChain a veces chocan al instalarse juntos, así que este agente usa su propio entorno: crea `.venv-crew` y un `requirements-crew.txt` con `crewai`, `a2a-sdk>=1.2`, `fastapi`, `uvicorn[standard]` y `python-dotenv`. Instálalo ahí.
+
+Crea `src/agente_Edith_outsourcing_ti/` con la misma forma que el de viajes, siguiendo `AGENTS.md`:
+
+1) `tools.py`. Dos herramientas con el `@tool` de `crewai.tools`: `catalogo_perfiles()` y `cotizador(perfil, cantidad, meses, tarifa_mensual)`. `catalogo_perfiles` devuelve los perfiles TI disponibles: Programador/Desarrollador, Desarrollador Full Stack, Administrador de Base de Datos (DBA), Desarrollador Java/.NET, Analista QA/Testing y Analista de Sistemas/BI. `cotizador` calcula el subtotal y total según el perfil, la cantidad de personas, el período en meses y la tarifa mensual informada. Si faltan datos, las herramientas deben solicitar la aclaración correspondiente y no inventar tarifas, perfiles ni condiciones.
+
+2) `prompts.py`. Tres textos: `ROL`, `OBJETIVO` e `HISTORIA` del agente. Que digan que Edith es especialista en cotizaciones de outsourcing de recursos humanos TI; que prepara cotizaciones simples considerando el perfil requerido, la cantidad de personas, el período y la tarifa informada; que puede identificar el perfil más cercano a partir de la necesidad descrita; que solo habla de cotizaciones de outsourcing TI, solo usa los datos proporcionados y devueltos por las herramientas, responde en español y de forma breve. Debe indicar que la cotización requiere validación humana antes de aprobarse o enviarse. También debe dejar claro que no selecciona ni contrata personas, no administra trabajadores, no garantiza disponibilidad ni inicia contrataciones. Si la consulta no trata sobre cotizaciones de outsourcing de recursos humanos TI, lo dice en una frase y no responde.
+
+3) `crew.py`. El modelo con `LLM(model="gemini/" + MODELO, api_key=GOOGLE_API_KEY)`, un `Agent` con las dos herramientas, una `Task` cuya descripción incluye la pregunta del usuario y lo que se habló antes, y un `Crew` con ambos. CrewAI no trae memoria por conversación, así que hazla manualmente: un diccionario que guarde el historial por `context_id` y se lo pase a la `Task`. La función `async responder(texto, context_id)` hace eso, ejecuta el crew —con `kickoff_async` si existe; si no, con `asyncio.to_thread`— y devuelve el texto.
+
+CrewAI no tiene grafo, pero igual necesito ver qué hace. Agrega:
+- `saltos(texto)`: ejecuta el crew con `verbose=True` y un `step_callback` que imprima cada paso del agente: qué pensó, qué herramienta llamó y con qué argumentos, y qué le devolvió. Al final, indica cuántas herramientas usó.
+- `diagrama()`: imprime en Mermaid la estructura del crew armada a mano: la tarea, el agente y sus dos herramientas (`Task --> Agent --> tools`).
+Conecta las dos a `main.py` igual que en viajes: `python main.py Edith_outsourcing_ti "pregunta" --saltos` y `--diagrama` (con `.venv-crew` activo).
+
+4) `server.py`. Igual que el de viajes: `crear_tarjeta("Agente de Edith_outsourcing_ti", "Prepara cotizaciones simples de outsourcing de recursos humanos TI según perfil, cantidad, período y tarifa mensual. No selecciona ni contrata personas.", URL_EDITH_OUTSOURCING_TI, dos skills)` y `app = crear_app(tarjeta, responder)`. Configura el agente para ejecutarse en `http://127.0.0.1:8001`.
+
+No lo levantes tú. Dime cómo activar `.venv-crew`, cómo probarlo sin servidor con `python main.py Edith_outsourcing_ti "cotización de 2 desarrolladores Full Stack por 6 meses" --saltos` y `--diagrama`, y el comando `uvicorn src.agente_Edith_outsourcing_ti.server:app --port 8001 --reload`, junto con lo que debería verse en la terminal si arrancó bien.

@@ -1,0 +1,15 @@
+Ahora un cuarto programa, el coordinador, 
+que no sabe nada de cotizaciones de TI: lo que hace es enrutar la pregunta al agente correspondiente Edith, Cristian o Rodrigo por A2A y repite la respuesta. Es un grafo de LangGraph con un solo nodo, y también se expone como servidor para poder hablarle. Va en src/coordinador/, siguiendo AGENTS.md:
+
+1) cliente.py. Las dos funciones para hablar con otro agente, usando el cliente de a2a-sdk (no armes el JSON a mano):
+- obtener_cliente(url): descarga la ficha del agente que vive en esa url (A2ACardResolver) y arma un cliente con ella (create_client, sin streaming, protocolo JSONRPC). Guarda el cliente en un diccionario para no descargar la ficha cada vez.
+- preguntar(cliente, texto, context_id): manda el texto como mensaje de usuario con ese context_id y lee lo que vuelve. Puede volver como un mensaje directo (entonces toma su texto) o como una tarea (entonces espera a que esté completada y junta el texto de sus artifacts). Devuelve el texto.
+
+2) graph.py. Un grafo con estado MessagesState y un solo nodo, delegar: toma el último mensaje del usuario, usa el thread_id de la conversación como context_id (o uuid4 si no hay), llama preguntar contra URL_OUTSOURCING, URL_DESARROLLO, URL_MINERIA (segun corresponda) y devuelve la respuesta como mensaje del agente. START → delegar → END, compilado con MemorySaver. Más responder(texto, context_id), saltos(texto) y diagrama(), igual que en los otros agentes, conectadas a main.py (python main.py coordinador "pregunta" --saltos).
+
+
+3) server.py. Ficha "Coordinador" y app = crear_app(tarjeta, responder), como siempre.
+
+4) scripts/probar_coordinador.py. Un script que le hace dos preguntas seguidas al coordinador (URL_COORDINADOR) con el mismo context_id y muestra que la segunda respuesta recuerda la primera.
+
+No levantes nada. Dime el comando uvicorn recuérdame en que puertos estan correindo los otros agentes

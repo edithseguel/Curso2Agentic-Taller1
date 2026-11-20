@@ -1,0 +1,17 @@
+meta {
+  name: chat-Outsourcing
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+}
+
+body:json {
+  {
+    "user_id": "cliente-outsourcing",
+    "texto": "Necesito dos desarrolladores Python por seis meses."
+  }
+}

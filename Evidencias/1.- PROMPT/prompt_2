@@ -1,0 +1,13 @@
+Ahora quiero la parte que todos los agentes van a compartir: el "servidor A2A". Es el programa que recibe los mensajes que llegan por internet, se los pasa al agente y devuelve la respuesta. Lo escribimos una sola vez en src/comun/ y después cada agente lo usa.
+
+Antes de escribir código, revisa qué versión de a2a-sdk tenemos instalada y qué nombres trae, con este comando: python -c "import a2a.server.apps, a2a.server.agent_execution, a2a.server.request_handlers, a2a.server.tasks, a2a.types; print(dir(a2a.server.apps))". Usa los nombres que existan de verdad; esta librería cambió entre versiones.
+
+Crea tres archivos, siguiendo AGENTS.md:
+
+1) src/comun/executor.py. Una clase Executor (hereda de AgentExecutor de a2a-sdk) que recibe en su constructor la función responder(texto, context_id) del agente. Cuando llega un mensaje: saca el texto que escribió el usuario (context.get_user_input()), toma el identificador de la conversación (context.context_id; si viene vacío, inventa uno con uuid4), llama a responder con los dos y pone la respuesta en la cola de salida como un mensaje del agente, con el mismo context_id. Si responder falla, en vez de romperse devuelve un mensaje que diga qué pasó. El método cancel solo responde que no está soportado.
+
+2) src/comun/servidor.py. Una función crear_app(tarjeta, responder) que arma y devuelve la aplicación FastAPI lista para correr: usa DefaultRequestHandler con nuestro Executor y un InMemoryTaskStore, y la clase de a2a-sdk que monta todo sobre FastAPI. Agrega una ruta GET /salud que devuelva {"ok": true} para saber si el servidor está vivo. Con esto, el servidor responde en "/" a los mensajes y publica la tarjeta en /.well-known/agent-card.json.
+
+3) src/comun/tarjeta.py. Una función crear_tarjeta(nombre, descripcion, url, skills) que devuelve la Agent Card, o sea la "ficha" del agente: nombre, qué hace, en qué dirección vive, versión "1.0.0", sin streaming, y entrada y salida de texto. skills es una lista de (id, nombre, descripcion, ejemplo).
+
+Todavía no crees ningún agente. Al final dime cómo comprobar que los tres archivos importan sin errores.

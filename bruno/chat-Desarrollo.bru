@@ -1,0 +1,17 @@
+meta {
+  name: chat-Desarrollo
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+}
+
+body:json {
+  {
+    "user_id": "cliente-desarrollo",
+    "texto": "Necesito cotizar el desarrollo de una aplicación web."
+  }
+}

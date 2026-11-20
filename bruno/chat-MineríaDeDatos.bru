@@ -1,0 +1,17 @@
+meta {
+  name: chat-MineríaDeDatos
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{base_url}}/chat
+  body: json
+}
+
+body:json {
+  {
+    "user_id": "cliente-mineria",
+    "texto": "Necesito una cotización para analizar datos de ventas."
+  }
+}

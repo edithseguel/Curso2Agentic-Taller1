@@ -1,0 +1,28 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Entornos y cachés de Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.langgraph_api/
+
+# Datos generados o locales
+data/
+datos/
+*.csv
+*.tsv
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.pkl
+
+# Archivos del sistema y del editor
+.DS_Store
+.idea/
+.vscode/

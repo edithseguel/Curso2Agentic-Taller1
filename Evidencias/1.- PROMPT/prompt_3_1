@@ -1,0 +1,8 @@
+modifica el agente para que no invente la tarifa mensual. Este valor hora estará dado para cada perfil en UF en el archivo .env y el valor mensual siempre será el valor hora por 120
+estas son las variables a considerar:
+"Programador/Desarrollador" en la variable vh_perf_prog
+    "Desarrollador Full Stack" en la variable vh_perf_progfs
+    "Administrador de Base de Datos (DBA)" en la variable vh_perf_dba
+    "Desarrollador Java/.NET" en la variable vh_perf_prognet
+    "Analista QA/Testing" en la variable vh_perf_qa
+    "Analista de Sistemas/BI" en la variable vh_perf_analis

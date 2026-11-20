@@ -1,0 +1,15 @@
+
+# Web que muestra los agentes en ejecución
+https://orquesta.rioseco.me/
+
+#punto de entrada y coordina los envíos a los agentes
+https://coordinador.rioseco.me 
+
+#Edith_outsourcing_ti
+https://edith.rioseco.me/
+
+#Cristian_desarrollo_ti
+https://cristian.rioseco.me/
+
+#Rodrigo_mineria_de_datos
+https://rodrigo.rioseco.me/

@@ -1,0 +1,45 @@
+Quiero armar un proyecto nuevo en la carpeta raiz donde estás ubicado, sin crear una subcarpeta.
+Va a tener cuatro agentes que se hablan entre sí por el protocolo A2A: 
+uno de cotizaciones de Outsourcing de personal TI, uno de cotizaciones de desarrollo ti, uno de cotizaciones de mineria de datos 
+y un coordinador. 
+Por ahora solo quiero la base, sin ningún agente. Hazlo así y explícame cada cosa al crearla:
+
+1) Entorno virtual. Crea una carpeta .venv con python3 -m venv .venv. Es una copia privada de Python para este proyecto: lo que instalemos aquí no toca el resto de mi computador.
+
+2) Librerías. Crea requirements.txt con exactamente estas líneas:
+langchain>=1.3,<2
+langchain-core>=1.6,<2
+langgraph>=1.2,<2
+langchain-google-genai>=4.3,<5
+pydantic>=2.7,<3
+python-dotenv>=1.0
+httpx>=0.27
+fastapi>=0.115
+uvicorn[standard]>=0.30
+a2a-sdk>=1.2
+pytest>=8
+Instálalas con un solo pip install -r requirements.txt. Al final corre pip show a2a-sdk y escribe en el README qué versión quedó instalada: la vamos a necesitar después.
+
+3) Configuración. Crea .env.example con estas variables y un comentario de una línea que diga para qué sirve cada una:
+GOOGLE_API_KEY=            (mi clave de Gemini; yo la pego en .env, nunca en el código)
+MODELO=gemini-3.5-flash-lite
+URL_OUTSOURCING=http://127.0.0.1:8001  (dónde va a estar escuchando el agente de Edith, cotizacions de Outsourcing TI)
+URL_DESARROLLO=http://127.0.0.1:8002  (el agente de Cristian, cotizacions de Desarrollo TI)
+URL_MINERIA=http://127.0.0.1:8003  (el agente de Rodrigo, cotizacions de Mineria de Datos)
+URL_COORDINADOR=http://127.0.0.1:8004   (el coordinador)
+Crea .gitignore con .env, .venv*, __pycache__ y .pytest_cache para que la clave y los archivos temporales nunca suban a GitHub.
+
+4) Carpetas. 
+Crea estas carpetas, cada una con un archivo __init__.py vacío (así Python las reconoce como módulos): src/comun, src/coordinador, scripts y tests. Cada agente vivirá en su propia carpeta con la misma forma: tools.py, prompts.py, graph.py o crew.py, y server.py.
+
+5) Reglas. Crea AGENTS.md con estas 5 reglas para todo lo que generes después en este proyecto:
+- Todo en español: nombres, comentarios, mensajes.
+- Las funciones que usan internet son async.
+- Toda llamada por red tiene un timeout explícito.
+- Si algo no responde, el error se muestra en una sola línea entendible, sin stack trace.
+- Cada agente expone una función responder(texto, context_id) que devuelve un texto. Es el contrato que todos cumplen.
+- Cada agente se puede correr desde la terminal sin servidor, igual que en el Curso 1: python main.py {agente} "pregunta". Con --saltos muestra por qué nodos y herramientas pasó; con --diagrama imprime su estructura en Mermaid sin ejecutarlo.
+
+6) main.py en la raíz. Recibe el nombre del agente  y la pregunta; importa src/{agente}/graph.py o crew.py y llama a su función responder. Si viene --saltos llama a su función saltos(texto); si viene --diagrama llama a diagrama(). Por ahora solo deja el esqueleto que avise "ese agente todavía no existe".
+
+Al terminar, muéstrame la lista de archivos creados y los comandos para activar el entorno en Mac y en Windows.
