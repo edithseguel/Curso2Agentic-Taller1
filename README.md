@@ -158,3 +158,4 @@ curl "https://api.telegram.org/botTU_TOKEN_DE_BOT/getWebhookInfo"
 
 No guardes el token del bot en Git. La lógica para leer y responder mensajes se
 incorporará en la siguiente parte del proyecto.
+# Curso2Agentic-Taller1
