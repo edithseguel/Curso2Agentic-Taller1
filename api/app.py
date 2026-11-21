@@ -3,11 +3,13 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from hmac import compare_digest
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Request, status
+from fastapi import Body, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
+import httpx
 from langchain_core.messages import AIMessage
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,6 +27,9 @@ from src.coordinador.graph import (
 load_dotenv()
 registro = logging.getLogger(__name__)
 MODELO = os.getenv("MODELO", "").strip()
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
+TELEGRAM_SECRET = os.getenv("TELEGRAM_SECRET", "").strip()
+_TIEMPO_ESPERA_TELEGRAM = httpx.Timeout(30.0)
 
 
 class ChatRequest(BaseModel):
@@ -194,8 +199,8 @@ async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONR
         )
         respuesta = _texto_mensaje(estado["messages"][-1])
         return ChatResponse(ruta=ruta, motivo=motivo, respuesta=respuesta)
-    except Exception:
-        registro.exception("Falló la consulta de chat para la ruta %s", ruta)
+    except Exception as error:
+        registro.error("Falló la consulta de chat para la ruta %s: %s", ruta, error)
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
@@ -204,9 +209,57 @@ async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONR
         )
 
 
+async def _enviar_mensaje_telegram(chat_id: int | str, texto: str) -> None:
+    """Envía una respuesta de texto mediante la API HTTP de Telegram."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    async with httpx.AsyncClient(timeout=_TIEMPO_ESPERA_TELEGRAM) as cliente:
+        respuesta = await cliente.post(url, json={"chat_id": chat_id, "text": texto})
+        respuesta.raise_for_status()
+        cuerpo = respuesta.json()
+    if not cuerpo.get("ok"):
+        raise RuntimeError("Telegram rechazó el envío del mensaje.")
+
+
 @app.post("/telegram", include_in_schema=False)
 async def telegram(
-    _actualizacion: Annotated[Any, Body(description="Actualización JSON enviada por Telegram.")]
+    actualizacion: Annotated[
+        Any, Body(description="Actualización JSON enviada por Telegram.")
+    ],
+    secreto: Annotated[
+        str | None,
+        Header(
+            alias="X-Telegram-Bot-Api-Secret-Token",
+            description="Secreto configurado al registrar el webhook.",
+        ),
+    ] = None,
 ) -> dict[str, bool]:
-    """Recibe actualizaciones de Telegram; se implementará posteriormente."""
+    """Procesa mensajes de texto recibidos desde el webhook de Telegram."""
+    if not TELEGRAM_SECRET or not compare_digest(secreto or "", TELEGRAM_SECRET):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado.")
+
+    if not isinstance(actualizacion, dict):
+        return {"ok": True}
+    mensaje = actualizacion.get("message")
+    if not isinstance(mensaje, dict):
+        return {"ok": True}
+    chat = mensaje.get("chat")
+    texto = mensaje.get("text")
+    if not isinstance(chat, dict) or not chat.get("id") or not isinstance(texto, str):
+        return {"ok": True}
+    texto = texto.strip()
+    if not texto:
+        return {"ok": True}
+
+    chat_id = chat["id"]
+    ruta, _motivo = _datos_ruta(texto)
+    try:
+        estado: dict[str, Any] = await graph.ainvoke(
+            {"messages": [{"role": "user", "content": texto}]},
+            config=_configuracion(str(chat_id)),
+        )
+        respuesta = _texto_mensaje(estado["messages"][-1])
+        await _enviar_mensaje_telegram(chat_id, respuesta)
+        registro.info("Telegram chat_id=%s ruta=%s", chat_id, ruta)
+    except Exception:
+        registro.error("Falló Telegram para chat_id=%s ruta=%s", chat_id, ruta)
     return {"ok": True}

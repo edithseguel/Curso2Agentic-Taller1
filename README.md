@@ -140,22 +140,53 @@ Visita `https://cotizaciones-api-tu-identificador.herokuapp.com/docs`.
 
 ## Conectar Telegram
 
-Actualmente `POST /telegram` confirma la recepción con `{"ok": true}`, pero
-todavía no procesa ni responde mensajes. Para dejar el webhook preparado,
-después de desplegar la API en una URL pública HTTPS, crea un bot con
-[@BotFather](https://t.me/BotFather) y ejecuta:
+La API recibe los mensajes en `POST /telegram`, valida el secreto del webhook,
+los deriva al coordinador usando el `chat_id` como memoria de conversación y
+responde con la API HTTP de Telegram. No se usa ninguna librería de bot.
+
+1. Crea el bot con [@BotFather](https://t.me/BotFather), mediante `/newbot`,
+   y copia el token. Elige también un secreto difícil de adivinar.
+
+2. Configura las credenciales en la aplicación de API de Heroku:
 
 ```bash
-curl -X POST "https://api.telegram.org/botTU_TOKEN_DE_BOT/setWebhook" \
-  -d "url=https://cotizaciones-api-tu-identificador.herokuapp.com/telegram"
+heroku config:set TELEGRAM_TOKEN="TU_TOKEN_DE_BOT" TELEGRAM_SECRET="TU_SECRETO" -a cotizaciones-api-tu-identificador
 ```
 
-Comprueba el webhook con:
+3. Guarda y publica los cambios tanto en GitHub como en Heroku:
 
 ```bash
-curl "https://api.telegram.org/botTU_TOKEN_DE_BOT/getWebhookInfo"
+git add api/app.py scripts .env.example README.md
+git commit -m "conectar webhook de Telegram"
+git push origin main
+git push https://git.heroku.com/cotizaciones-api-tu-identificador.git main
 ```
 
-No guardes el token del bot en Git. La lógica para leer y responder mensajes se
-incorporará en la siguiente parte del proyecto.
+4. Registra el webhook y comprueba su estado. Ejecuta estos comandos desde la
+   raíz, con las credenciales disponibles en tu entorno local:
+
+```bash
+PUBLIC_URL="https://cotizaciones-api-tu-identificador.herokuapp.com" python scripts/set_webhook.py
+PUBLIC_URL="https://cotizaciones-api-tu-identificador.herokuapp.com" python scripts/webhook_info.py
+```
+
+5. Escribe al bot los seis mensajes del *prompt 2*. Revisa que cada consulta
+   siguió su ruta correcta en los logs:
+
+```bash
+heroku logs --tail -a cotizaciones-api-tu-identificador
+```
+
+Si el bot no responde, verifica que el webhook apunte a
+`https://.../telegram`, que el secreto sea idéntico en Heroku y en Telegram,
+y que el token sea correcto.
+
+Para probar antes de desplegar, abre un túnel:
+
+```bash
+cloudflared tunnel --url http://localhost:8000
+```
+
+Usa la URL HTTPS que entrega Cloudflare como `PUBLIC_URL` al ejecutar los
+scripts. No guardes el token ni el secreto en Git.
 # Curso2Agentic-Taller1
