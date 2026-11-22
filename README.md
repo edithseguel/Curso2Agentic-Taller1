@@ -20,8 +20,9 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edita `.env` y completa al menos `GOOGLE_API_KEY`, `MODELO`, `vhorahom` y las
-tarifas `vh_perf_*`. No subas `.env`: contiene secretos y está ignorado por Git.
+Edita `.env` y completa `GOOGLE_API_KEY` y `MODELO`. Las horas y tarifas base
+de cotización están definidas en los archivos `conocimiento.py` de cada
+agente. No subas `.env`: contiene secretos y está ignorado por Git.
 
 `.env.example` documenta todas las variables que usa el código: clave y modelo
 de Gemini, tarifas, URL de cada agente y URL del coordinador.
@@ -111,9 +112,9 @@ heroku create cotizaciones-api-tu-identificador
 Configura las variables de Gemini y tarifas en cada aplicación que use modelo:
 
 ```bash
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" vhorahom="1" vh_perf_prog="1" vh_perf_progfs="1" vh_perf_dba="1" vh_perf_prognet="1" vh_perf_qa="1" vh_perf_analis="1" -a cotizaciones-edith-tu-identificador
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" vhorahom="1" -a cotizaciones-cristian-tu-identificador
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" vhorahom="1" -a cotizaciones-rodrigo-tu-identificador
+heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-edith-tu-identificador
+heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-cristian-tu-identificador
+heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-rodrigo-tu-identificador
 ```
 
 Indica qué módulo debe iniciar cada aplicación y publica el mismo repositorio

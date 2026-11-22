@@ -1,26 +1,75 @@
-"""Grafo LangGraph de enrutamiento A2A."""
+"""Grafo LangGraph que clasifica las consultas de cotizaciones."""
 
 import asyncio
 import os
+from collections.abc import Awaitable, Callable
+from operator import add
+from typing import Annotated, Literal
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import BaseModel, Field
 
-from .cliente import obtener_cliente, preguntar
+from src.agente_Cristian_desarrollo_ti.graph import responder as responder_cristian
+from src.agente_Edith_outsourcing_ti.crew import responder as responder_edith
+from src.agente_Rodrigo_mineria_de_datos.graph import responder as responder_rodrigo
+
+from .prompts import (
+    PROMPT_COORDINADOR,
+    RESPUESTA_GENERICA,
+)
 
 
 load_dotenv()
 
-URL_OUTSOURCING = os.getenv("URL_OUTSOURCING", "http://127.0.0.1:8001")
-URL_DESARROLLO = os.getenv("URL_DESARROLLO", "http://127.0.0.1:8002")
-URL_MINERIA = os.getenv("URL_MINERIA", "http://127.0.0.1:8003")
+RUTA_CRISTIAN = "agente_Cristian_desarrollo_ti"
+RUTA_EDITH = "agente_Edith_outsourcing_ti"
+RUTA_RODRIGO = "agente_Rodrigo_mineria_de_datos"
+RUTA_GENERICA = "generica"
+
+
+class Decision(BaseModel):
+    """Decisión estructurada del nodo Coordinador."""
+
+    rutas: list[
+        Literal[
+            "agente_Cristian_desarrollo_ti",
+            "agente_Edith_outsourcing_ti",
+            "agente_Rodrigo_mineria_de_datos",
+            "generica",
+        ]
+    ] = Field(
+        min_length=1,
+        description="Uno o más agentes necesarios para atender el mensaje.",
+    )
+    motivo: str = Field(description="Una frase: por qué se eligieron esas rutas.")
+
+
+class EstadoCoordinador(MessagesState):
+    """Estado con la memoria del diálogo y el resultado del enrutamiento."""
+
+    ruta: str
+    rutas: list[str]
+    motivo: str
+    respuesta: str
+    resultados: Annotated[list[tuple[str, str]], add]
+
+
+modelo = os.getenv("MODELO", "").strip()
+if not modelo:
+    raise RuntimeError("Falta la variable MODELO en el archivo .env")
+
+llm = ChatGoogleGenerativeAI(model=modelo, temperature=0)
+enrutador = llm.with_structured_output(Decision)
 
 
 def _texto_mensaje(mensaje: object) -> str:
+    """Convierte el contenido de un mensaje de LangChain a texto."""
     contenido = getattr(mensaje, "content", mensaje)
     if isinstance(contenido, str):
         return contenido
@@ -32,53 +81,152 @@ def _texto_mensaje(mensaje: object) -> str:
     return str(contenido)
 
 
-def _url_para(texto: str) -> str:
-    """Elige el agente por el tema explícito de la consulta."""
-    texto = texto.lower()
-    if any(palabra in texto for palabra in ("minería", "mineria", "datos", "etl", "analítica", "analitica")):
-        return URL_MINERIA
-    if any(palabra in texto for palabra in ("desarrollo", "software", "sistema", "aplicación", "aplicacion", "programar")):
-        return URL_DESARROLLO
-    return URL_OUTSOURCING
+def _ultimo_texto(estado: EstadoCoordinador) -> str:
+    """Obtiene la última consulta humana del estado."""
+    for mensaje in reversed(estado["messages"]):
+        if isinstance(mensaje, HumanMessage) or getattr(mensaje, "type", "") == "human":
+            return _texto_mensaje(mensaje)
+    return _texto_mensaje(estado["messages"][-1])
 
 
-async def delegar(
-    estado: MessagesState, config: RunnableConfig
-) -> dict[str, list[AIMessage]]:
-    """Enruta el último mensaje del usuario y repite la respuesta del agente."""
-    texto = _texto_mensaje(estado["messages"][-1])
-    configuracion = config.get("configurable", {})
-    context_id = configuracion.get("thread_id") or str(uuid4())
-    cliente = await obtener_cliente(_url_para(texto))
-    respuesta = await preguntar(cliente, texto, context_id)
-    return {"messages": [AIMessage(content=respuesta)]}
+async def coordinador(estado: EstadoCoordinador) -> dict[str, str]:
+    """Decide de forma estructurada cuál ruta debe seguir la consulta."""
+    decision = await enrutador.ainvoke(
+        [SystemMessage(content=PROMPT_COORDINADOR), HumanMessage(content=_ultimo_texto(estado))]
+    )
+    rutas = list(dict.fromkeys(decision.rutas))
+    return {"ruta": ", ".join(rutas), "rutas": rutas, "motivo": decision.motivo}
 
 
-_constructor = StateGraph(MessagesState)
-_constructor.add_node("delegar", delegar)
-_constructor.add_edge(START, "delegar")
-_constructor.add_edge("delegar", END)
+def _respuesta(ruta: str, texto: str) -> dict[str, object]:
+    """Guarda una respuesta de ruta y la agrega a la memoria del diálogo."""
+    return {"resultados": [(ruta, texto)], "messages": [AIMessage(content=texto)]}
+
+
+def _solicitud_especializada(ruta: str, texto: str) -> str:
+    """Aísla la necesidad relevante cuando la consulta solicita varios servicios."""
+    servicio = {
+        RUTA_CRISTIAN: "desarrollo de software",
+        RUTA_EDITH: "outsourcing de recursos humanos TI",
+        RUTA_RODRIGO: "minería de datos",
+    }[ruta]
+    return (
+        f"Prepara únicamente la cotización de {servicio} solicitada por el usuario. "
+        "Ignora otras necesidades que aparezcan en el mensaje y usa tus herramientas "
+        "para calcular una propuesta si hay datos suficientes.\n\n"
+        f"Mensaje original:\n{texto}"
+    )
+
+
+async def _consultar_agente(
+    ruta: str,
+    responder_agente: Callable[[str, str | None], Awaitable[str]],
+    texto: str,
+    config: RunnableConfig,
+) -> dict[str, object]:
+    """Consulta un agente especializado y conserva un error legible si falla."""
+    context_id = config.get("configurable", {}).get("thread_id")
+    try:
+        respuesta = await responder_agente(_solicitud_especializada(ruta, texto), context_id)
+        return _respuesta(ruta, respuesta)
+    except Exception as error:
+        mensaje = str(error).splitlines()[0] or "no se pudo generar la cotización"
+        return _respuesta(ruta, f"No se pudo generar la cotización solicitada: {mensaje}")
+
+
+async def agente_cristian(
+    estado: EstadoCoordinador, config: RunnableConfig
+) -> dict[str, object]:
+    """Obtiene una propuesta del agente de cotizaciones de desarrollo."""
+    return await _consultar_agente(
+        RUTA_CRISTIAN, responder_cristian, _ultimo_texto(estado), config
+    )
+
+
+async def agente_edith(
+    estado: EstadoCoordinador, config: RunnableConfig
+) -> dict[str, object]:
+    """Obtiene una propuesta del agente de cotizaciones de outsourcing."""
+    return await _consultar_agente(RUTA_EDITH, responder_edith, _ultimo_texto(estado), config)
+
+
+async def agente_rodrigo(
+    estado: EstadoCoordinador, config: RunnableConfig
+) -> dict[str, object]:
+    """Obtiene una propuesta del agente de cotizaciones de minería de datos."""
+    return await _consultar_agente(
+        RUTA_RODRIGO, responder_rodrigo, _ultimo_texto(estado), config
+    )
+
+
+async def respuesta_generica(_estado: EstadoCoordinador) -> dict[str, object]:
+    """Responde asuntos no relacionados sin usar el modelo."""
+    return _respuesta(RUTA_GENERICA, RESPUESTA_GENERICA)
+
+
+def siguientes_rutas(estado: EstadoCoordinador) -> list[str]:
+    """Devuelve todos los nodos correspondientes a la decisión."""
+    return estado["rutas"]
+
+
+_constructor = StateGraph(EstadoCoordinador)
+_constructor.add_node("Coordinador", coordinador)
+_constructor.add_node(RUTA_CRISTIAN, agente_cristian)
+_constructor.add_node(RUTA_EDITH, agente_edith)
+_constructor.add_node(RUTA_RODRIGO, agente_rodrigo)
+_constructor.add_node(RUTA_GENERICA, respuesta_generica)
+_constructor.add_edge(START, "Coordinador")
+_constructor.add_conditional_edges(
+    "Coordinador",
+    siguientes_rutas,
+    {
+        RUTA_CRISTIAN: RUTA_CRISTIAN,
+        RUTA_EDITH: RUTA_EDITH,
+        RUTA_RODRIGO: RUTA_RODRIGO,
+        RUTA_GENERICA: RUTA_GENERICA,
+    },
+)
+_constructor.add_edge(RUTA_CRISTIAN, END)
+_constructor.add_edge(RUTA_EDITH, END)
+_constructor.add_edge(RUTA_RODRIGO, END)
+_constructor.add_edge(RUTA_GENERICA, END)
 graph = _constructor.compile(checkpointer=MemorySaver())
 
 
 def _configuracion(context_id: str | None) -> dict[str, dict[str, str]]:
+    """Configura el identificador de hilo para preservar memoria."""
     return {"configurable": {"thread_id": context_id or str(uuid4())}}
 
 
-async def responder(texto: str, context_id: str | None) -> str:
+async def ejecutar(texto: str, context_id: str | None) -> EstadoCoordinador:
+    """Ejecuta el grafo y devuelve el estado final completo."""
     estado = await graph.ainvoke(
         {"messages": [{"role": "user", "content": texto}]},
         config=_configuracion(context_id),
     )
-    return _texto_mensaje(estado["messages"][-1])
+    resultados = dict(estado["resultados"])
+    respuestas = [resultados[ruta] for ruta in estado["rutas"] if ruta in resultados]
+    estado["respuesta"] = "\n\n---\n\n".join(respuestas)
+    return estado
+
+
+async def responder(texto: str, context_id: str | None) -> str:
+    """Cumple el contrato común y devuelve solamente la respuesta."""
+    estado = await ejecutar(texto, context_id)
+    return str(estado["respuesta"])
 
 
 def saltos(texto: str) -> str:
-    respuesta = asyncio.run(responder(texto, None))
-    print("Nodo: delegar")
-    print("Total de saltos: 1")
-    return respuesta
+    """Ejecuta el grafo e informa los nodos y motivo de enrutamiento."""
+    estado = asyncio.run(ejecutar(texto, None))
+    print("Nodo: Coordinador")
+    print(f"Motivo: {estado['motivo']}")
+    for ruta in estado["rutas"]:
+        print(f"Nodo: {ruta}")
+    print(f"Total de saltos: {len(estado['rutas']) + 1}")
+    return str(estado["respuesta"])
 
 
 def diagrama() -> str:
+    """Devuelve la estructura Mermaid del grafo."""
     return graph.get_graph().draw_mermaid()

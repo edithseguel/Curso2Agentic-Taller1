@@ -10,16 +10,10 @@ from dotenv import load_dotenv
 from fastapi import Body, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 import httpx
-from langchain_core.messages import AIMessage
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.coordinador.graph import (
-    URL_DESARROLLO,
-    URL_MINERIA,
-    URL_OUTSOURCING,
-    _configuracion,
-    _texto_mensaje,
-    _url_para,
+    ejecutar,
     graph,
 )
 
@@ -110,25 +104,6 @@ class ErrorResponse(BaseModel):
     ]
 
 
-def _datos_ruta(texto: str) -> tuple[str, str]:
-    """Devuelve el nombre y motivo de la ruta elegida por el coordinador."""
-    url = _url_para(texto)
-    if url == URL_MINERIA:
-        return (
-            "agente_Rodrigo_mineria_de_datos",
-            "La consulta menciona datos, analítica, ETL o minería de datos.",
-        )
-    if url == URL_DESARROLLO:
-        return (
-            "agente_Cristian_desarrollo_ti",
-            "La consulta menciona desarrollo, software, sistemas o aplicaciones.",
-        )
-    return (
-        "agente_Edith_outsourcing_ti",
-        "La consulta se deriva a outsourcing de personal TI por defecto.",
-    )
-
-
 @asynccontextmanager
 async def ciclo_vida(app: FastAPI):
     """Conserva el grafo compilado durante toda la vida de la aplicación."""
@@ -191,14 +166,15 @@ async def health() -> dict[str, object]:
 )
 async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONResponse:
     """Ejecuta el grafo con el hilo asociado al usuario."""
-    ruta, motivo = _datos_ruta(solicitud.texto)
+    ruta = "desconocida"
     try:
-        estado: dict[str, Any] = await request.app.state.grafo_coordinador.ainvoke(
-            {"messages": [{"role": "user", "content": solicitud.texto}]},
-            config=_configuracion(solicitud.user_id),
+        estado: dict[str, Any] = await ejecutar(solicitud.texto, solicitud.user_id)
+        ruta = str(estado["ruta"])
+        return ChatResponse(
+            ruta=ruta,
+            motivo=str(estado["motivo"]),
+            respuesta=str(estado["respuesta"]),
         )
-        respuesta = _texto_mensaje(estado["messages"][-1])
-        return ChatResponse(ruta=ruta, motivo=motivo, respuesta=respuesta)
     except Exception as error:
         registro.error("Falló la consulta de chat para la ruta %s: %s", ruta, error)
         return JSONResponse(
@@ -251,13 +227,11 @@ async def telegram(
         return {"ok": True}
 
     chat_id = chat["id"]
-    ruta, _motivo = _datos_ruta(texto)
+    ruta = "desconocida"
     try:
-        estado: dict[str, Any] = await graph.ainvoke(
-            {"messages": [{"role": "user", "content": texto}]},
-            config=_configuracion(str(chat_id)),
-        )
-        respuesta = _texto_mensaje(estado["messages"][-1])
+        estado: dict[str, Any] = await ejecutar(texto, str(chat_id))
+        ruta = str(estado["ruta"])
+        respuesta = str(estado["respuesta"])
         await _enviar_mensaje_telegram(chat_id, respuesta)
         registro.info("Telegram chat_id=%s ruta=%s", chat_id, ruta)
     except Exception:

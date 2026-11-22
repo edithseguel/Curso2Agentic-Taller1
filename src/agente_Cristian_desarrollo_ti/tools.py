@@ -1,56 +1,38 @@
 """Herramientas para preparar cotizaciones de desarrollo de sistemas."""
 
-import os
-
-from dotenv import load_dotenv
 from langchain_core.tools import tool
 
+from .conocimiento import ETAPAS_BASE, TARIFA_REFERENCIAL_UF_HORA, total_horas_base
 
-load_dotenv()
 
-
-def _horas_validas(horas: float) -> bool:
-    """Comprueba que las horas sean un número positivo."""
-    return isinstance(horas, (int, float)) and horas > 0
+def _meses_validos(meses: int) -> bool:
+    """Comprueba que el plazo sea un número entero y positivo."""
+    return isinstance(meses, int) and not isinstance(meses, bool) and meses > 0
 
 
 @tool
-def planeador(requerimiento: str, horas: float) -> str:
-    """Distribuye las horas disponibles entre análisis, desarrollo y pruebas."""
+def planeador(requerimiento: str) -> str:
+    """Devuelve las etapas y horas base de la propuesta de desarrollo."""
     if not requerimiento or not requerimiento.strip():
         return "Falta el requerimiento del cliente; no puedo planear sin ese dato."
-    if not _horas_validas(horas):
-        return "Faltan horas válidas y positivas; no puedo inventar una estimación."
-
-    analisis = round(horas * 0.20, 2)
-    desarrollo = round(horas * 0.60, 2)
-    pruebas = round(horas - analisis - desarrollo, 2)
+    detalle = "; ".join(f"{etapa}: {horas} horas" for etapa, horas in ETAPAS_BASE)
     return (
-        "Distribución orientativa para el requerimiento indicado "
-        "(20% análisis, 60% desarrollo y 20% pruebas): "
-        f"análisis: {analisis:g} horas; desarrollo: {desarrollo:g} horas; "
-        f"pruebas: {pruebas:g} horas; total: {horas:g} horas."
+        f"Distribución base para el requerimiento indicado: {detalle}; "
+        f"total: {total_horas_base()} horas."
     )
 
 
 @tool
-def cotizador(horas: float) -> str:
-    """Calcula el desglose y total de una cotización en UF."""
-    if not _horas_validas(horas):
-        return "Faltan horas válidas y positivas; no puedo calcular la cotización."
-
-    valor_hora = os.getenv("vhorahom", "").strip()
-    if not valor_hora:
-        return "Falta la variable vhorahom en el archivo .env; no puedo inventar la tarifa."
-    try:
-        tarifa = float(valor_hora.replace(",", "."))
-    except ValueError:
-        return "La variable vhorahom no contiene una tarifa numérica válida."
-    if tarifa <= 0:
-        return "La variable vhorahom debe contener una tarifa positiva."
-
-    total = horas * tarifa
+def cotizador(meses: int = 1) -> str:
+    """Calcula la propuesta base mensual y total para el plazo indicado."""
+    if not _meses_validos(meses):
+        return "El plazo debe ser una cantidad de meses entera y positiva."
+    horas = total_horas_base()
+    tarifa = TARIFA_REFERENCIAL_UF_HORA
+    total_mensual = horas * tarifa
+    total = total_mensual * meses
     return (
-        f"Desglose: {horas:g} horas × {tarifa:.2f} UF por hora = "
-        f"{total:.2f} UF. Total estimado: {total:.2f} UF."
+        f"Desglose base mensual: {horas} horas × {tarifa:.2f} UF por hora = "
+        f"{total_mensual:.2f} UF. "
+        f"Plazo: {meses} mes(es). Total estimado del período: {total:.2f} UF."
     )
