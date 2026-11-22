@@ -7,7 +7,7 @@ from hmac import compare_digest
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Header, HTTPException, Request, status
+from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -196,11 +196,25 @@ async def _enviar_mensaje_telegram(chat_id: int | str, texto: str) -> None:
         raise RuntimeError("Telegram rechazó el envío del mensaje.")
 
 
+async def _procesar_mensaje_telegram(chat_id: int | str, texto: str) -> None:
+    """Genera y envía la respuesta sin retrasar el webhook de Telegram."""
+    ruta = "desconocida"
+    try:
+        estado: dict[str, Any] = await ejecutar(texto, str(chat_id))
+        ruta = str(estado["ruta"])
+        respuesta = str(estado["respuesta"])
+        await _enviar_mensaje_telegram(chat_id, respuesta)
+        registro.info("Telegram chat_id=%s ruta=%s", chat_id, ruta)
+    except Exception:
+        registro.error("Falló Telegram para chat_id=%s ruta=%s", chat_id, ruta)
+
+
 @app.post("/telegram", include_in_schema=False)
 async def telegram(
     actualizacion: Annotated[
         Any, Body(description="Actualización JSON enviada por Telegram.")
     ],
+    tareas: BackgroundTasks,
     secreto: Annotated[
         str | None,
         Header(
@@ -227,13 +241,5 @@ async def telegram(
         return {"ok": True}
 
     chat_id = chat["id"]
-    ruta = "desconocida"
-    try:
-        estado: dict[str, Any] = await ejecutar(texto, str(chat_id))
-        ruta = str(estado["ruta"])
-        respuesta = str(estado["respuesta"])
-        await _enviar_mensaje_telegram(chat_id, respuesta)
-        registro.info("Telegram chat_id=%s ruta=%s", chat_id, ruta)
-    except Exception:
-        registro.error("Falló Telegram para chat_id=%s ruta=%s", chat_id, ruta)
+    tareas.add_task(_procesar_mensaje_telegram, chat_id, texto)
     return {"ok": True}
