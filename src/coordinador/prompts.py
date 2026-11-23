@@ -23,7 +23,7 @@ Rutas disponibles:
 Si hay duda, usa esta guía:
 - Desarrollo: implementar un desarrollo de software o una solución de software.
 - Outsourcing: HH para un ingeniero de desarrollo de software, arquitecto de
-  software o equipo de QA.
+  software, analista de datos, analista QA o equipo de QA.
 - Minería de datos: evaluación de tendencias proyectadas, detección anticipada
   de problemas en una cadena de procesos o detección de posibles fraudes.
 

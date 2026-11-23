@@ -143,7 +143,7 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
     ) or bool(
         re.search(
             r"\b\d+\s+(?:profesionales|personas|desarrolladores|arquitectos|qa|"
-            r"analistas|analista\s+(?:de\s+)?qa)\b",
+            r"analistas?|analista\s+(?:de\s+)?qa)\b",
             texto_normalizado,
         )
     )
