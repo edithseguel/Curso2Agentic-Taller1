@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import re
 from collections.abc import Awaitable, Callable
 from operator import add
 from typing import Annotated, Literal
@@ -89,13 +90,81 @@ def _ultimo_texto(estado: EstadoCoordinador) -> str:
     return _texto_mensaje(estado["messages"][-1])
 
 
+def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
+    """Identifica solicitudes inequívocas para evitar rutas no requeridas."""
+    texto_normalizado = texto.casefold()
+    desarrollo = any(
+        termino in texto_normalizado
+        for termino in (
+            "desarrollo",
+            "software",
+            "portal",
+            "aplicación",
+            "aplicacion",
+            "sistema",
+            "sitio web",
+        )
+    )
+    mineria = any(
+        termino in texto_normalizado
+        for termino in (
+            "minería",
+            "mineria",
+            "análisis de datos",
+            "analítica",
+            "analitica",
+            "tendencia",
+            "fraude",
+            "preprocesamiento",
+            "modelado",
+        )
+    )
+    outsourcing = any(
+        termino in texto_normalizado
+        for termino in (
+            "outsourcing",
+            "recursos humanos",
+            "personal ti",
+            "contratar",
+            "contratación",
+            "contratacion",
+            "equipo de qa",
+            "horas hombre",
+            "hh",
+        )
+    ) or bool(
+        re.search(
+            r"\b\d+\s+(?:profesionales|personas|desarrolladores|analistas|qa|arquitectos)\b",
+            texto_normalizado,
+        )
+    )
+    return desarrollo, outsourcing, mineria
+
+
 async def coordinador(estado: EstadoCoordinador) -> dict[str, str]:
     """Decide de forma estructurada cuál ruta debe seguir la consulta."""
+    texto = _ultimo_texto(estado)
     decision = await enrutador.ainvoke(
-        [SystemMessage(content=PROMPT_COORDINADOR), HumanMessage(content=_ultimo_texto(estado))]
+        [SystemMessage(content=PROMPT_COORDINADOR), HumanMessage(content=texto)]
     )
     rutas = list(dict.fromkeys(decision.rutas))
-    return {"ruta": ", ".join(rutas), "rutas": rutas, "motivo": decision.motivo}
+    desarrollo, outsourcing, mineria = _intenciones_explicitas(texto)
+
+    if desarrollo and not outsourcing and not mineria:
+        rutas = [RUTA_CRISTIAN]
+        motivo = (
+            "La solicitud corresponde a un proyecto de desarrollo de software "
+            "y no solicita personal TI."
+        )
+    elif outsourcing and not desarrollo and not mineria:
+        rutas = [RUTA_EDITH]
+        motivo = "La solicitud pide explícitamente personal o perfiles TI."
+    else:
+        if RUTA_EDITH in rutas and not outsourcing:
+            rutas.remove(RUTA_EDITH)
+        motivo = decision.motivo
+
+    return {"ruta": ", ".join(rutas), "rutas": rutas, "motivo": motivo}
 
 
 def _respuesta(ruta: str, texto: str) -> dict[str, object]:

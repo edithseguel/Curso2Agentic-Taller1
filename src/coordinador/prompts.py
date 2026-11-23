@@ -35,6 +35,10 @@ rutas independientes necesarias para atenderla. Por ejemplo, "2
 desarrolladores web y un análisis del proceso de ventas" requiere
 agente_Edith_outsourcing_ti y agente_Rodrigo_mineria_de_datos. No agregues
 rutas que no correspondan.
+
+No derives a Outsourcing por mencionar un plazo en meses, un portal web, un
+proyecto o desarrollo de software. Outsourcing exige una petición explícita de
+personas, perfiles, HH, contratación, equipo o una cantidad de profesionales.
 """.strip()
 
 RESPUESTA_CRISTIAN = (
