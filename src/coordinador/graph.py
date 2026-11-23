@@ -126,6 +126,8 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
         for termino in (
             "software",
             "portal",
+            "página web",
+            "pagina web",
             "aplicación",
             "aplicacion",
             "sistema",
@@ -153,6 +155,13 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
             "estados financieros",
             "análisis financiero",
             "analisis financiero",
+            "análisis de negocio",
+            "analisis de negocio",
+            "análisis de incidentes",
+            "analisis de incidentes",
+            "negocio futuro",
+            "proyección",
+            "proyeccion",
         )
     )
     outsourcing = any(
