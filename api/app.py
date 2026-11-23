@@ -4,11 +4,12 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from hmac import compare_digest
+from pathlib import Path
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,6 +25,7 @@ MODELO = os.getenv("MODELO", "").strip()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
 TELEGRAM_SECRET = os.getenv("TELEGRAM_SECRET", "").strip()
 _TIEMPO_ESPERA_TELEGRAM = httpx.Timeout(30.0)
+RUTA_UI = Path(__file__).with_name("index.html")
 
 
 class ChatRequest(BaseModel):
@@ -138,6 +140,12 @@ app = FastAPI(
     ],
     lifespan=ciclo_vida,
 )
+
+
+@app.get("/", include_in_schema=False)
+async def inicio() -> FileResponse:
+    """Sirve la interfaz web del chat de cotizaciones."""
+    return FileResponse(RUTA_UI)
 
 
 @app.get("/health", tags=["agente_Cristian_desarrollo_ti"])

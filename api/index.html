@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cotizaciones TI</title>
+  <style>
+    :root {
+      --fondo: #f4f7fb;
+      --superficie: #ffffff;
+      --texto: #162033;
+      --secundario: #63708a;
+      --borde: #dce3ef;
+      --primario: #3158d7;
+      --primario-oscuro: #2445ac;
+      --acento: #e9efff;
+      --usuario: #e7edff;
+      --sombra: 0 18px 45px rgba(27, 48, 93, .1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--fondo); color: var(--texto);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .contenedor { width: min(1040px, calc(100% - 32px)); margin: 0 auto; }
+    header { padding: 30px 0 22px; display: flex; justify-content: space-between; gap: 18px; align-items: center; }
+    .marca { display: flex; align-items: center; gap: 12px; }
+    .icono {
+      width: 45px; height: 45px; display: grid; place-items: center; border-radius: 14px;
+      background: linear-gradient(135deg, var(--primario), #7b55df); color: white; font-size: 23px;
+      box-shadow: 0 9px 18px rgba(49, 88, 215, .25);
+    }
+    h1 { margin: 0; font-size: clamp(20px, 4vw, 27px); letter-spacing: -.6px; }
+    .marca p, .estado { margin: 3px 0 0; color: var(--secundario); font-size: 13px; }
+    .estado { padding: 8px 11px; border: 1px solid var(--borde); border-radius: 20px; background: white; white-space: nowrap; }
+    .punto { color: #159b61; font-size: 15px; }
+    .panel {
+      display: grid; grid-template-columns: 275px minmax(0, 1fr); min-height: 650px;
+      border: 1px solid var(--borde); border-radius: 22px; overflow: hidden; background: var(--superficie); box-shadow: var(--sombra);
+    }
+    aside { padding: 26px 20px; background: #f9faff; border-right: 1px solid var(--borde); }
+    aside h2 { font-size: 14px; margin: 0 0 11px; }
+    aside p { color: var(--secundario); font-size: 13px; line-height: 1.55; margin: 0 0 22px; }
+    .rutas { display: grid; gap: 9px; }
+    .ruta { display: flex; gap: 9px; align-items: start; padding: 11px; border-radius: 11px; background: white; border: 1px solid var(--borde); font-size: 12px; line-height: 1.35; }
+    .ruta b { display: block; font-size: 12px; }
+    .ruta span { color: var(--secundario); }
+    .sugerencias { margin-top: 25px; }
+    .sugerencias button {
+      width: 100%; margin-top: 8px; padding: 10px; text-align: left; border: 1px solid var(--borde);
+      border-radius: 9px; color: var(--primario-oscuro); background: white; cursor: pointer; font: inherit; font-size: 12px;
+    }
+    .sugerencias button:hover { border-color: var(--primario); background: var(--acento); }
+    .chat { min-width: 0; display: flex; flex-direction: column; }
+    .chat-cabecera { padding: 22px 25px; border-bottom: 1px solid var(--borde); }
+    .chat-cabecera h2 { margin: 0; font-size: 17px; }
+    .chat-cabecera p { margin: 5px 0 0; color: var(--secundario); font-size: 13px; }
+    #mensajes { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 17px; }
+    .mensaje { display: flex; gap: 10px; max-width: 91%; }
+    .mensaje.usuario { align-self: flex-end; flex-direction: row-reverse; }
+    .avatar { flex: 0 0 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; background: var(--acento); color: var(--primario); font-size: 14px; }
+    .usuario .avatar { background: var(--primario); color: white; }
+    .burbuja { padding: 12px 14px; border-radius: 4px 15px 15px; background: #f0f3f8; line-height: 1.55; font-size: 14px; white-space: pre-wrap; }
+    .usuario .burbuja { background: var(--usuario); border-radius: 15px 4px 15px 15px; }
+    .meta { margin-top: 9px; display: flex; gap: 7px; flex-wrap: wrap; }
+    .etiqueta { padding: 4px 7px; border-radius: 6px; background: var(--acento); color: var(--primario-oscuro); font-size: 11px; }
+    .motivo { color: var(--secundario); font-size: 11px; padding: 4px 0; }
+    .escribiendo { color: var(--secundario); font-size: 13px; font-style: italic; }
+    form { display: flex; gap: 10px; padding: 18px 22px; border-top: 1px solid var(--borde); background: #fbfcff; }
+    input { min-width: 0; flex: 1; padding: 13px 14px; border: 1px solid var(--borde); border-radius: 11px; outline: none; color: var(--texto); font: inherit; }
+    input:focus { border-color: var(--primario); box-shadow: 0 0 0 3px rgba(49, 88, 215, .12); }
+    button.enviar { border: 0; border-radius: 11px; padding: 0 18px; color: white; background: var(--primario); cursor: pointer; font-weight: 700; }
+    button.enviar:hover { background: var(--primario-oscuro); }
+    button:disabled { opacity: .6; cursor: wait; }
+    @media (max-width: 760px) {
+      header { padding: 18px 0; } .estado { display: none; } .panel { grid-template-columns: 1fr; min-height: 680px; }
+      aside { display: none; } #mensajes { padding: 18px; } form { padding: 14px; } .mensaje { max-width: 97%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="contenedor">
+    <header>
+      <div class="marca">
+        <div class="icono">✦</div>
+        <div><h1>Cotizaciones TI</h1><p>Asistente coordinador de propuestas</p></div>
+      </div>
+      <div class="estado"><span class="punto">●</span> Coordinador disponible</div>
+    </header>
+    <main class="panel">
+      <aside>
+        <h2>¿Qué podemos cotizar?</h2>
+        <p>Describe tu necesidad y el coordinador derivará la solicitud al especialista adecuado.</p>
+        <div class="rutas">
+          <div class="ruta"><span>▣</span><div><b>Desarrollo TI</b><span>Software, portales y sistemas.</span></div></div>
+          <div class="ruta"><span>◉</span><div><b>Outsourcing TI</b><span>Perfiles, cantidad y plazo.</span></div></div>
+          <div class="ruta"><span>⌁</span><div><b>Minería de datos</b><span>Análisis, tendencias y modelos.</span></div></div>
+        </div>
+        <div class="sugerencias">
+          <h2>Ejemplos</h2>
+          <button data-texto="Necesito cotizar un portal web para proveedores durante 3 meses.">Cotizar un portal web</button>
+          <button data-texto="Necesito 2 analistas QA por 3 meses.">Cotizar equipo QA</button>
+          <button data-texto="Quiero analizar tendencias de ventas durante 3 meses.">Cotizar análisis de ventas</button>
+        </div>
+      </aside>
+      <section class="chat">
+        <div class="chat-cabecera"><h2>Chat de cotizaciones</h2><p>Las propuestas son referenciales y requieren validación humana.</p></div>
+        <div id="mensajes">
+          <article class="mensaje">
+            <div class="avatar">✦</div>
+            <div class="burbuja">¡Hola! Cuéntame qué servicio TI necesitas cotizar. Puedo ayudarte con desarrollo de software, outsourcing TI y minería de datos.</div>
+          </article>
+        </div>
+        <form id="formulario">
+          <input id="texto" autocomplete="off" placeholder="Ej.: Necesito cotizar un portal web durante 3 meses" required>
+          <button class="enviar" id="enviar" type="submit">Enviar</button>
+        </form>
+      </section>
+    </main>
+  </div>
+  <script>
+    const mensajes = document.querySelector("#mensajes");
+    const formulario = document.querySelector("#formulario");
+    const campoTexto = document.querySelector("#texto");
+    const enviar = document.querySelector("#enviar");
+    const usuarioId = localStorage.getItem("cotizaciones_usuario") || crypto.randomUUID();
+    localStorage.setItem("cotizaciones_usuario", usuarioId);
+
+    function agregarMensaje(texto, tipo, datos = null) {
+      const articulo = document.createElement("article");
+      articulo.className = `mensaje ${tipo}`;
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = tipo === "usuario" ? "Tú" : "✦";
+      const contenido = document.createElement("div");
+      const burbuja = document.createElement("div");
+      burbuja.className = "burbuja";
+      burbuja.textContent = texto;
+      contenido.appendChild(burbuja);
+      if (datos) {
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const ruta = document.createElement("span");
+        ruta.className = "etiqueta";
+        ruta.textContent = datos.ruta;
+        const motivo = document.createElement("span");
+        motivo.className = "motivo";
+        motivo.textContent = datos.motivo;
+        meta.append(ruta, motivo);
+        contenido.appendChild(meta);
+      }
+      articulo.append(avatar, contenido);
+      mensajes.appendChild(articulo);
+      mensajes.scrollTop = mensajes.scrollHeight;
+      return articulo;
+    }
+
+    document.querySelectorAll("[data-texto]").forEach((boton) => {
+      boton.addEventListener("click", () => {
+        campoTexto.value = boton.dataset.texto;
+        campoTexto.focus();
+      });
+    });
+
+    formulario.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const texto = campoTexto.value.trim();
+      if (!texto) return;
+      agregarMensaje(texto, "usuario");
+      campoTexto.value = "";
+      campoTexto.disabled = true;
+      enviar.disabled = true;
+      const espera = agregarMensaje("Preparando tu propuesta de cotización…", "asistente");
+      espera.querySelector(".burbuja").classList.add("escribiendo");
+      try {
+        const respuesta = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: usuarioId, texto })
+        });
+        const datos = await respuesta.json();
+        espera.remove();
+        if (!respuesta.ok) throw new Error(datos.detalle || "No fue posible procesar la consulta.");
+        agregarMensaje(datos.respuesta, "asistente", datos);
+      } catch (error) {
+        espera.remove();
+        agregarMensaje(`No se pudo generar la cotización. ${error.message}`, "asistente");
+      } finally {
+        campoTexto.disabled = false;
+        enviar.disabled = false;
+        campoTexto.focus();
+      }
+    });
+  </script>
+</body>
+</html>
