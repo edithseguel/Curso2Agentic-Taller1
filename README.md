@@ -1,19 +1,42 @@
-# Curso2Agentic-Taller1
+# Curso2Agentic-Taller1 · Cotizaciones TI
 
-Sistema de cotizaciones TI basado en agentes A2A. Un coordinador recibe cada
-consulta y la deriva al agente especializado:
+Sistema de cotizaciones TI basado en agentes A2A. El coordinador FastAPI recibe
+una consulta desde la UI web o Telegram, valida el acceso y deriva la solicitud
+por HTTP/A2A al o los especialistas correspondientes.
 
-- **Edith:** outsourcing de personal TI.
 - **Cristian:** desarrollo de software.
+- **Edith:** outsourcing de personal TI.
 - **Rodrigo:** minería y análisis de datos.
 
-Además expone una API FastAPI con interfaz web, Swagger y una colección Bruno
-para probarla. El coordinador consulta los tres especialistas mediante Agent
-Cards y A2A HTTP; por eso los agentes deben estar activos antes de cotizar.
+## Integrantes y aportes
 
-## Requisitos y configuración
+| Integrante | Aporte principal |
+| --- | --- |
+| Edith Seguel | Agente de Outsourcing, catálogo y cálculo de perfiles, canal Telegram. |
+| Cristian Rioseco | Agente de Desarrollo TI, herramientas de planificación y cotización. |
+| Rodrigo Salas | Agente de Minería de Datos, planificación y cotización analítica. |
+| Grupo 2 | Coordinador A2A, UI FastAPI, pruebas, documentación y despliegue. |
 
-Se requiere Python 3.12 o superior. Desde la raíz del repositorio:
+## Arquitectura
+
+La aplicación coordinadora usa Agent Cards y A2A HTTP para comunicarse con tres
+aplicaciones independientes:
+
+| Componente | Repositorio |
+| --- | --- |
+| Coordinador y UI | Este repositorio. |
+| Agente Edith | <https://github.com/edithseguel/Curso2Agentic-Agente-Edith> |
+| Agente Cristian | <https://github.com/edithseguel/Curso2Agentic-Agente-Cristian> |
+| Agente Rodrigo | <https://github.com/edithseguel/Curso2Agentic-Agente-Rodrigo> |
+
+El coordinador conserva las cifras, unidades y plazos de cada agente y entrega
+las propuestas en secciones separadas. Las cotizaciones son referenciales y
+requieren validación humana.
+
+## Requisitos y configuración local
+
+Se requiere Python 3.12, acceso a internet para Gemini y una clave propia de
+Google. Desde la raíz:
 
 ```bash
 python3 -m venv .venv
@@ -22,192 +45,147 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edita `.env` y completa `GOOGLE_API_KEY`, `MODELO` y un
-`TOKEN_ACCESO_CHAT` aleatorio. Las horas y tarifas base
-de cotización están definidas en los archivos `conocimiento.py` de cada
-agente. No subas `.env`: contiene secretos y está ignorado por Git.
+En `.env` configura, sin publicar valores reales:
 
-`.env.example` documenta todas las variables que usa el código: clave y modelo
-de Gemini, tarifas, URL de cada agente y URL del coordinador.
+```env
+GOOGLE_API_KEY=tu_clave_de_gemini
+MODELO=gemini-3.5-flash-lite
+TOKEN_ACCESO_CHAT=token_largo_y_aleatorio
+URL_EDITH_OUTSOURCING_TI=http://127.0.0.1:8001
+URL_CRISTIAN_DESARROLLO_TI=http://127.0.0.1:8002
+URL_RODRIGO_MINERIA_DE_DATOS=http://127.0.0.1:8003
+```
 
-`TOKEN_ACCESO_CHAT` se valida exclusivamente en el servidor para proteger
-`POST /chat`. No se debe guardar en el repositorio, en capturas ni en el código
-frontend. La interfaz web lo solicita para la sesión actual y lo envía en el
-header `X-Token-Acceso`.
+Genera el token con:
 
-## Correr el coordinador en local
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
 
-Abre cuatro terminales en la raíz del proyecto, activa el entorno virtual en
-cada una con `source .venv/bin/activate` y levanta los tres agentes:
+No subas `.env`, tokens, claves, cookies ni sesiones. `.env.example` contiene
+solo nombres de variables y valores ficticios.
+
+## Ejecución local reproducible
+
+Abre cuatro terminales en la raíz, activa el entorno virtual en cada una y
+levanta los tres agentes:
 
 ```bash
 uvicorn src.agente_Edith_outsourcing_ti.server:app --port 8001
-```
-
-```bash
 uvicorn src.agente_Cristian_desarrollo_ti.server:app --port 8002
-```
-
-```bash
 uvicorn src.agente_Rodrigo_mineria_de_datos.server:app --port 8003
 ```
 
-En la cuarta terminal puedes consultar el coordinador directamente:
+En una cuarta terminal inicia la UI/API:
 
 ```bash
-python main.py coordinador "Necesito cotizar dos desarrolladores Python por seis meses"
+uvicorn api.app:app --port 8000
 ```
 
-Para ver los saltos:
+Abre <http://127.0.0.1:8000/>. Ingresa el valor de `TOKEN_ACCESO_CHAT` y realiza
+una consulta. Para detener cualquier componente utiliza `Ctrl+C`.
+
+También puedes inspeccionar los saltos del coordinador:
 
 ```bash
-python main.py coordinador "Necesito cotizar una aplicación web" --saltos
+python main.py coordinador "Necesito un portal web, 2 analistas QA por 3 meses y un análisis de incidentes" --saltos
 ```
 
-El servidor A2A del coordinador, si lo necesitas, se levanta así:
+## Pruebas de API y seguridad
+
+Swagger está disponible en <http://127.0.0.1:8000/docs>. Ejemplo autorizado:
 
 ```bash
-uvicorn src.coordinador.server:app --port 8004
-```
-
-## Levantar la API
-
-Con los tres agentes activos, inicia la API:
-
-```bash
-uvicorn api.app:app --reload --port 8000
-```
-
-Abre Swagger en <http://localhost:8000/docs>. Prueba una consulta con:
-
-```bash
-curl -X POST http://localhost:8000/chat \
+curl -X POST http://127.0.0.1:8000/chat \
   -H "Content-Type: application/json" \
   -H "X-Token-Acceso: $TOKEN_ACCESO_CHAT" \
-  -d '{"user_id":"cliente-123","texto":"Necesito dos desarrolladores Python por seis meses."}'
+  -d '{"user_id":"cliente-prueba","texto":"Necesito un portal web para proveedores durante 3 meses."}'
 ```
 
-Una solicitud sin token o con token incorrecto devuelve `401`. Si el servidor
-no tiene configurado `TOKEN_ACCESO_CHAT`, devuelve `503` y no abre el chat.
-Si un agente A2A o el proveedor falla, el endpoint devuelve `502` con un
-mensaje seguro en una sola línea.
+Prueba de rechazo, sin mostrar ni enviar el token:
 
-La colección está en `bruno/`. Selecciona el entorno `Local` y modifica
-`base_url` para alternar entre el servidor local y Heroku.
+```bash
+curl -i -X POST http://127.0.0.1:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"cliente-prueba","texto":"Necesito un portal web."}'
+```
 
-## Pruebas
+El primer caso retorna `200`; el segundo retorna `401`. Si no se configuró
+`TOKEN_ACCESO_CHAT`, la API retorna `503`. Si no es posible contactar un
+agente A2A o el proveedor, la API retorna `502` con un mensaje seguro.
 
-Ejecuta las pruebas automatizadas con:
+Ejecuta las pruebas automatizadas:
 
 ```bash
 python -m pytest
 ```
 
-Las pruebas cubren acceso autorizado/rechazado, ausencia de configuración,
-enrutamiento de uno/tres servicios y la delegación A2A HTTP.
+## Publicación opcional en Heroku
 
-También puedes comprobar que la API está disponible:
+Heroku utiliza un puerto por aplicación. Publica el coordinador y los tres
+agentes como aplicaciones separadas. Cada agente se despliega desde su propio
+repositorio GitHub y debe tener estas variables:
 
-```bash
-curl http://localhost:8000/health
+| Agente | Variables requeridas |
+| --- | --- |
+| Edith | `GOOGLE_API_KEY`, `MODELO`, `URL_EDITH_OUTSOURCING_TI` |
+| Cristian | `GOOGLE_API_KEY`, `MODELO`, `URL_CRISTIAN_DESARROLLO_TI` |
+| Rodrigo | `GOOGLE_API_KEY`, `MODELO`, `URL_RODRIGO_MINERIA_DE_DATOS` |
+
+En cada repositorio de agente, Heroku ejecuta el `Procfile` incluido. Después
+de desplegar, verifica su Agent Card:
+
+```text
+https://NOMBRE-DE-LA-APP.herokuapp.com/.well-known/agent-card.json
 ```
 
-## Despliegue en Heroku
+En la aplicación coordinadora configura las URL base públicas de los tres
+agentes, sin agregar rutas como `/docs` ni `/.well-known/agent-card.json`:
 
-Heroku asigna un único puerto por aplicación. Por eso debes desplegar **cuatro
-aplicaciones**: una por agente y una para la API. Instala e inicia sesión en
-Heroku CLI antes de ejecutar:
-
-```bash
-heroku login
-heroku create cotizaciones-edith-tu-identificador
-heroku create cotizaciones-cristian-tu-identificador
-heroku create cotizaciones-rodrigo-tu-identificador
-heroku create cotizaciones-api-tu-identificador
+```env
+URL_EDITH_OUTSOURCING_TI=https://APP-EDITH.herokuapp.com
+URL_CRISTIAN_DESARROLLO_TI=https://APP-CRISTIAN.herokuapp.com
+URL_RODRIGO_MINERIA_DE_DATOS=https://APP-RODRIGO.herokuapp.com
+TOKEN_ACCESO_CHAT=token_largo_y_aleatorio
+GOOGLE_API_KEY=tu_clave_de_gemini
+MODELO=gemini-3.5-flash-lite
 ```
 
-Configura las variables de Gemini y tarifas en cada aplicación que use modelo:
+Guarda las variables y reinicia la aplicación coordinadora. Si en los logs
+aparece `127.0.0.1:8001`, `8002` o `8003`, falta configurar la URL pública del
+agente respectivo en el coordinador.
 
-```bash
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-edith-tu-identificador
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-cristian-tu-identificador
-heroku config:set GOOGLE_API_KEY="tu-clave" MODELO="gemini-3.5-flash-lite" -a cotizaciones-rodrigo-tu-identificador
+## Telegram
+
+Telegram es un canal complementario. Configura en la aplicación coordinadora:
+
+```env
+TELEGRAM_TOKEN=token_del_bot
+TELEGRAM_SECRET=secreto_largo_aleatorio
+TELEGRAM_ALLOWED_CHAT_IDS=123456789,987654321
+PUBLIC_URL=https://NOMBRE-COORDINADOR.herokuapp.com
 ```
 
-Indica qué módulo debe iniciar cada aplicación y publica el mismo repositorio
-en cada remoto:
+`TELEGRAM_ALLOWED_CHAT_IDS` contiene solo identificadores numéricos de cuentas
+autorizadas, separados por coma. Una lista vacía permite cualquier chat que
+llegue con el secreto del webhook; para pruebas controladas se debe definir al
+menos un ID autorizado.
+
+Con las mismas variables en el entorno local, registra y revisa el webhook:
 
 ```bash
-heroku config:set APP_MODULE=src.agente_Edith_outsourcing_ti.server -a cotizaciones-edith-tu-identificador
-heroku config:set APP_MODULE=src.agente_Cristian_desarrollo_ti.server -a cotizaciones-cristian-tu-identificador
-heroku config:set APP_MODULE=src.agente_Rodrigo_mineria_de_datos.server -a cotizaciones-rodrigo-tu-identificador
-heroku config:set APP_MODULE=api.app -a cotizaciones-api-tu-identificador
-git push https://git.heroku.com/cotizaciones-edith-tu-identificador.git main
-git push https://git.heroku.com/cotizaciones-cristian-tu-identificador.git main
-git push https://git.heroku.com/cotizaciones-rodrigo-tu-identificador.git main
-git push https://git.heroku.com/cotizaciones-api-tu-identificador.git main
+python scripts/set_webhook.py
+python scripts/webhook_info.py
 ```
 
-Finalmente conecta la API con los tres agentes desplegados:
+Prueba autorizada: envía desde un `chat_id` incluido una solicitud de
+cotización y verifica la respuesta del bot junto a un `POST /telegram 200` en
+los logs. Prueba rechazada: usa una cuenta no incluida y verifica el `403`.
+No incluyas tokens, secretos, IDs completos ni correos en las capturas.
 
-```bash
-heroku config:set URL_OUTSOURCING=https://cotizaciones-edith-tu-identificador.herokuapp.com URL_DESARROLLO=https://cotizaciones-cristian-tu-identificador.herokuapp.com URL_MINERIA=https://cotizaciones-rodrigo-tu-identificador.herokuapp.com TOKEN_ACCESO_CHAT="TOKEN_LARGO_ALEATORIO" -a cotizaciones-api-tu-identificador
-```
+## Límites y dependencias externas
 
-Visita `https://cotizaciones-api-tu-identificador.herokuapp.com/docs`.
-
-## Conectar Telegram
-
-La API recibe los mensajes en `POST /telegram`, valida el secreto del webhook,
-los deriva al coordinador usando el `chat_id` como memoria de conversación y
-responde con la API HTTP de Telegram. No se usa ninguna librería de bot.
-Para limitar quién puede usar el bot, configura opcionalmente
-`TELEGRAM_ALLOWED_CHAT_IDS` con los identificadores autorizados separados por
-coma; un chat no incluido recibe `403`.
-
-1. Crea el bot con [@BotFather](https://t.me/BotFather), mediante `/newbot`,
-   y copia el token. Elige también un secreto difícil de adivinar.
-
-2. Configura las credenciales en la aplicación de API de Heroku:
-
-```bash
-heroku config:set TELEGRAM_TOKEN="TU_TOKEN_DE_BOT" TELEGRAM_SECRET="TU_SECRETO" -a cotizaciones-api-tu-identificador
-```
-
-3. Guarda y publica los cambios tanto en GitHub como en Heroku:
-
-```bash
-git add api/app.py scripts .env.example README.md
-git commit -m "conectar webhook de Telegram"
-git push origin main
-git push https://git.heroku.com/cotizaciones-api-tu-identificador.git main
-```
-
-4. Registra el webhook y comprueba su estado. Ejecuta estos comandos desde la
-   raíz, con las credenciales disponibles en tu entorno local:
-
-```bash
-PUBLIC_URL="https://cotizaciones-api-tu-identificador.herokuapp.com" python scripts/set_webhook.py
-PUBLIC_URL="https://cotizaciones-api-tu-identificador.herokuapp.com" python scripts/webhook_info.py
-```
-
-5. Escribe al bot los seis mensajes del *prompt 2*. Revisa que cada consulta
-   siguió su ruta correcta en los logs:
-
-```bash
-heroku logs --tail -a cotizaciones-api-tu-identificador
-```
-
-Si el bot no responde, verifica que el webhook apunte a
-`https://.../telegram`, que el secreto sea idéntico en Heroku y en Telegram,
-y que el token sea correcto.
-
-Para probar antes de desplegar, abre un túnel:
-
-```bash
-cloudflared tunnel --url http://localhost:8000
-```
-
-Usa la URL HTTPS que entrega Cloudflare como `PUBLIC_URL` al ejecutar los
-scripts. No guardes el token ni el secreto en Git.
-# Curso2Agentic-Taller1
+Gemini, Telegram y Heroku requieren conexión, cuentas y credenciales propias.
+Las propuestas son referenciales; los supuestos, alcance definitivo y
+aprobación requieren validación humana. El evaluador puede utilizar sus propias
+credenciales o solicitar acceso de prueba mediante un canal privado.
