@@ -35,7 +35,7 @@
     .estado { padding: 8px 11px; border: 1px solid var(--borde); border-radius: 20px; background: white; white-space: nowrap; }
     .punto { color: #159b61; font-size: 15px; }
     .panel {
-      display: grid; grid-template-columns: 275px minmax(0, 1fr); min-height: 650px;
+      display: grid; grid-template-columns: 275px minmax(0, 1fr); height: min(700px, calc(100dvh - 120px)); min-height: 510px;
       border: 1px solid var(--borde); border-radius: 22px; overflow: hidden; background: var(--superficie); box-shadow: var(--sombra);
     }
     aside { padding: 26px 20px; background: #f9faff; border-right: 1px solid var(--borde); }
@@ -51,11 +51,11 @@
       border-radius: 9px; color: var(--primario-oscuro); background: white; cursor: pointer; font: inherit; font-size: 12px;
     }
     .sugerencias button:hover { border-color: var(--primario); background: var(--acento); }
-    .chat { min-width: 0; display: flex; flex-direction: column; }
+    .chat { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
     .chat-cabecera { padding: 22px 25px; border-bottom: 1px solid var(--borde); }
     .chat-cabecera h2 { margin: 0; font-size: 17px; }
     .chat-cabecera p { margin: 5px 0 0; color: var(--secundario); font-size: 13px; }
-    #mensajes { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 17px; }
+    #mensajes { flex: 1; min-height: 0; padding: 24px; overflow-y: auto; scroll-behavior: smooth; display: flex; flex-direction: column; gap: 17px; }
     .mensaje { display: flex; gap: 10px; max-width: 91%; }
     .mensaje.usuario { align-self: flex-end; flex-direction: row-reverse; }
     .avatar { flex: 0 0 31px; height: 31px; border-radius: 50%; display: grid; place-items: center; background: var(--acento); color: var(--primario); font-size: 14px; }
@@ -74,6 +74,7 @@
     button:disabled { opacity: .6; cursor: wait; }
     @media (max-width: 760px) {
       header { padding: 18px 0; } .estado { display: none; } .panel { grid-template-columns: 1fr; min-height: 680px; }
+      .panel { height: calc(100dvh - 89px); min-height: 520px; border-radius: 16px; }
       aside { display: none; } #mensajes { padding: 18px; } form { padding: 14px; } .mensaje { max-width: 97%; }
     }
   </style>
@@ -151,7 +152,10 @@
       }
       articulo.append(avatar, contenido);
       mensajes.appendChild(articulo);
-      mensajes.scrollTop = mensajes.scrollHeight;
+      requestAnimationFrame(() => {
+        articulo.scrollIntoView({ behavior: "smooth", block: "end" });
+        mensajes.scrollTop = mensajes.scrollHeight;
+      });
       return articulo;
     }
 

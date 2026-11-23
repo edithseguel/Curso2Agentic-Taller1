@@ -103,6 +103,8 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
             "sistema",
             "sitio web",
             "plataforma web",
+            "desarrollo web",
+            "desarrollo de web",
             "implementar",
             "proyecto de desarrollo",
             "desarrollo de software",
@@ -142,7 +144,7 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
         )
     ) or bool(
         re.search(
-            r"\b\d+\s+(?:profesionales|personas|desarrolladores|arquitectos|qa|"
+            r"\b\d+\s+(?:profesionales|personas|desarrolladores|arquitectos?|qa|"
             r"analistas?|analista\s+(?:de\s+)?qa)\b",
             texto_normalizado,
         )
