@@ -22,6 +22,7 @@ from src.agente_Rodrigo_mineria_de_datos.graph import responder as responder_rod
 
 from .prompts import (
     PROMPT_COORDINADOR,
+    PROMPT_REFORMULADOR,
     RESPUESTA_GENERICA,
 )
 
@@ -51,12 +52,22 @@ class Decision(BaseModel):
     motivo: str = Field(description="Una frase: por qué se eligieron esas rutas.")
 
 
+class Reformulacion(BaseModel):
+    """Consulta aclarada antes de decidir las rutas."""
+
+    texto: str = Field(
+        min_length=1,
+        description="Consulta reformulada sin inventar datos del usuario.",
+    )
+
+
 class EstadoCoordinador(MessagesState):
     """Estado con la memoria del diálogo y el resultado del enrutamiento."""
 
     ruta: str
     rutas: list[str]
     motivo: str
+    pregunta_reformulada: str
     respuesta: str
     resultados: Annotated[list[tuple[str, str]], add]
 
@@ -67,6 +78,7 @@ if not modelo:
 
 llm = ChatGoogleGenerativeAI(model=modelo, temperature=0)
 enrutador = llm.with_structured_output(Decision)
+reformulador = llm.with_structured_output(Reformulacion)
 
 
 def _texto_mensaje(mensaje: object) -> str:
@@ -88,6 +100,22 @@ def _ultimo_texto(estado: EstadoCoordinador) -> str:
         if isinstance(mensaje, HumanMessage) or getattr(mensaje, "type", "") == "human":
             return _texto_mensaje(mensaje)
     return _texto_mensaje(estado["messages"][-1])
+
+
+def _texto_consulta(estado: EstadoCoordinador) -> str:
+    """Devuelve la versión reformulada cuando está disponible."""
+    return str(estado.get("pregunta_reformulada") or _ultimo_texto(estado))
+
+
+async def reformular(estado: EstadoCoordinador) -> dict[str, str]:
+    """Aclara la consulta antes de que el coordinador elija sus rutas."""
+    resultado = await reformulador.ainvoke(
+        [
+            SystemMessage(content=PROMPT_REFORMULADOR),
+            HumanMessage(content=_ultimo_texto(estado)),
+        ]
+    )
+    return {"pregunta_reformulada": resultado.texto.strip()}
 
 
 def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
@@ -154,7 +182,7 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
 
 async def coordinador(estado: EstadoCoordinador) -> dict[str, str]:
     """Decide de forma estructurada cuál ruta debe seguir la consulta."""
-    texto = _ultimo_texto(estado)
+    texto = _texto_consulta(estado)
     decision = await enrutador.ainvoke(
         [SystemMessage(content=PROMPT_COORDINADOR), HumanMessage(content=texto)]
     )
@@ -210,7 +238,8 @@ def _solicitud_especializada(ruta: str, texto: str) -> str:
         "El mensaje puede contener otros servicios: ignóralos por completo. No los "
         "menciones, no indiques que están fuera de tu alcance y no solicites datos "
         "para ellos. Usa solo los datos pertinentes a tu especialidad y tus "
-        "herramientas para calcular una propuesta si hay información suficiente.\n\n"
+        "herramientas para calcular una propuesta. Si faltan detalles, entrega la "
+        "propuesta base de tu especialidad con plazo de 1 mes.\n\n"
         f"Mensaje original:\n{texto}"
     )
 
@@ -236,7 +265,7 @@ async def agente_cristian(
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de desarrollo."""
     return await _consultar_agente(
-        RUTA_CRISTIAN, responder_cristian, _ultimo_texto(estado), config
+        RUTA_CRISTIAN, responder_cristian, _texto_consulta(estado), config
     )
 
 
@@ -244,7 +273,7 @@ async def agente_edith(
     estado: EstadoCoordinador, config: RunnableConfig
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de outsourcing."""
-    return await _consultar_agente(RUTA_EDITH, responder_edith, _ultimo_texto(estado), config)
+    return await _consultar_agente(RUTA_EDITH, responder_edith, _texto_consulta(estado), config)
 
 
 async def agente_rodrigo(
@@ -252,7 +281,7 @@ async def agente_rodrigo(
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de minería de datos."""
     return await _consultar_agente(
-        RUTA_RODRIGO, responder_rodrigo, _ultimo_texto(estado), config
+        RUTA_RODRIGO, responder_rodrigo, _texto_consulta(estado), config
     )
 
 
@@ -268,11 +297,13 @@ def siguientes_rutas(estado: EstadoCoordinador) -> list[str]:
 
 _constructor = StateGraph(EstadoCoordinador)
 _constructor.add_node("Coordinador", coordinador)
+_constructor.add_node("Reformulador", reformular)
 _constructor.add_node(RUTA_CRISTIAN, agente_cristian)
 _constructor.add_node(RUTA_EDITH, agente_edith)
 _constructor.add_node(RUTA_RODRIGO, agente_rodrigo)
 _constructor.add_node(RUTA_GENERICA, respuesta_generica)
-_constructor.add_edge(START, "Coordinador")
+_constructor.add_edge(START, "Reformulador")
+_constructor.add_edge("Reformulador", "Coordinador")
 _constructor.add_conditional_edges(
     "Coordinador",
     siguientes_rutas,
@@ -316,11 +347,13 @@ async def responder(texto: str, context_id: str | None) -> str:
 def saltos(texto: str) -> str:
     """Ejecuta el grafo e informa los nodos y motivo de enrutamiento."""
     estado = asyncio.run(ejecutar(texto, None))
+    print("Nodo: Reformulador")
+    print(f"Consulta reformulada: {estado['pregunta_reformulada']}")
     print("Nodo: Coordinador")
     print(f"Motivo: {estado['motivo']}")
     for ruta in estado["rutas"]:
         print(f"Nodo: {ruta}")
-    print(f"Total de saltos: {len(estado['rutas']) + 1}")
+    print(f"Total de saltos: {len(estado['rutas']) + 2}")
     return str(estado["respuesta"])
 
 

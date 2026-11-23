@@ -66,6 +66,7 @@ class ChatResponse(BaseModel):
             "example": {
                 "ruta": "agente_Edith_outsourcing_ti",
                 "motivo": "La consulta corresponde a contratación de personal TI.",
+                "consulta_reformulada": "Solicito cotizar dos desarrolladores Python por seis meses.",
                 "respuesta": "Cotización de outsourcing: ...",
             }
         }
@@ -83,6 +84,13 @@ class ChatResponse(BaseModel):
         Field(
             description="Criterio usado por el coordinador para seleccionar la ruta.",
             examples=["La consulta corresponde a contratación de personal TI."],
+        ),
+    ]
+    consulta_reformulada: Annotated[
+        str,
+        Field(
+            description="Consulta aclarada por el reformulador antes de activar agentes.",
+            examples=["Solicito cotizar dos desarrolladores Python por seis meses."],
         ),
     ]
     respuesta: Annotated[
@@ -181,6 +189,7 @@ async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONR
         return ChatResponse(
             ruta=ruta,
             motivo=str(estado["motivo"]),
+            consulta_reformulada=str(estado["pregunta_reformulada"]),
             respuesta=str(estado["respuesta"]),
         )
     except Exception as error:

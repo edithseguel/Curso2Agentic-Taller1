@@ -146,7 +146,7 @@
         ruta.textContent = datos.ruta;
         const motivo = document.createElement("span");
         motivo.className = "motivo";
-        motivo.textContent = datos.motivo;
+        motivo.textContent = `${datos.motivo} · Consulta interpretada: ${datos.consulta_reformulada}`;
         meta.append(ruta, motivo);
         contenido.appendChild(meta);
       }

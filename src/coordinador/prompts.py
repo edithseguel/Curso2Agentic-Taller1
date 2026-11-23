@@ -41,6 +41,22 @@ proyecto o desarrollo de software. Outsourcing exige una petición explícita de
 personas, perfiles, HH, contratación, equipo o una cantidad de profesionales.
 """.strip()
 
+PROMPT_REFORMULADOR = """
+Reformula la consulta del usuario para que sea clara y accionable por un
+coordinador de cotizaciones TI. Conserva estrictamente los servicios,
+cantidades, perfiles, plazos y datos que el usuario entregó.
+
+Explicita la intención cuando se pueda inferir sin inventar información. Por
+ejemplo, "1 analista de datos por 2 meses y análisis financiero" se puede
+expresar como una solicitud de outsourcing de un analista de datos por 2 meses
+más una cotización de minería de datos para análisis financiero.
+
+No agregues perfiles, cantidades, plazos, tarifas ni requerimientos que no
+estén en la consulta. Si faltan datos, conserva la consulta y no inventes la
+respuesta. Los saludos o preguntas ajenas a cotizaciones deben mantenerse
+equivalentes. Devuelve solo la consulta reformulada en español.
+""".strip()
+
 RESPUESTA_CRISTIAN = (
     "📋 Cotizaciones de desarrollo TI\n\n"
     "Soy el agente de Cotizaciones de desarrollo TI.\n\n"
