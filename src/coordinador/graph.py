@@ -96,13 +96,16 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
     desarrollo = any(
         termino in texto_normalizado
         for termino in (
-            "desarrollo",
             "software",
             "portal",
             "aplicación",
             "aplicacion",
             "sistema",
             "sitio web",
+            "plataforma web",
+            "implementar",
+            "proyecto de desarrollo",
+            "desarrollo de software",
         )
     )
     mineria = any(
@@ -117,6 +120,9 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
             "fraude",
             "preprocesamiento",
             "modelado",
+            "estados financieros",
+            "análisis financiero",
+            "analisis financiero",
         )
     )
     outsourcing = any(
@@ -129,12 +135,15 @@ def _intenciones_explicitas(texto: str) -> tuple[bool, bool, bool]:
             "contratación",
             "contratacion",
             "equipo de qa",
+            "analista de qa",
+            "analista qa",
             "horas hombre",
             "hh",
         )
     ) or bool(
         re.search(
-            r"\b\d+\s+(?:profesionales|personas|desarrolladores|analistas|qa|arquitectos)\b",
+            r"\b\d+\s+(?:profesionales|personas|desarrolladores|arquitectos|qa|"
+            r"analistas|analista\s+(?:de\s+)?qa)\b",
             texto_normalizado,
         )
     )
@@ -150,15 +159,30 @@ async def coordinador(estado: EstadoCoordinador) -> dict[str, str]:
     rutas = list(dict.fromkeys(decision.rutas))
     desarrollo, outsourcing, mineria = _intenciones_explicitas(texto)
 
-    if desarrollo and not outsourcing and not mineria:
-        rutas = [RUTA_CRISTIAN]
-        motivo = (
-            "La solicitud corresponde a un proyecto de desarrollo de software "
-            "y no solicita personal TI."
+    rutas_explicitas = [
+        ruta
+        for ruta, aplica in (
+            (RUTA_CRISTIAN, desarrollo),
+            (RUTA_EDITH, outsourcing),
+            (RUTA_RODRIGO, mineria),
         )
-    elif outsourcing and not desarrollo and not mineria:
-        rutas = [RUTA_EDITH]
-        motivo = "La solicitud pide explícitamente personal o perfiles TI."
+        if aplica
+    ]
+    if rutas_explicitas:
+        rutas = rutas_explicitas
+        if len(rutas) == 1 and rutas[0] == RUTA_CRISTIAN:
+            motivo = (
+                "La solicitud corresponde a un proyecto de desarrollo de software "
+                "y no solicita personal TI."
+            )
+        elif len(rutas) == 1 and rutas[0] == RUTA_EDITH:
+            motivo = "La solicitud pide explícitamente personal o perfiles TI."
+        else:
+            motivo = (
+                "La solicitud combina necesidades de "
+                + ", ".join(ruta.removeprefix("agente_").replace("_", " ") for ruta in rutas)
+                + "."
+            )
     else:
         if RUTA_EDITH in rutas and not outsourcing:
             rutas.remove(RUTA_EDITH)
@@ -181,8 +205,10 @@ def _solicitud_especializada(ruta: str, texto: str) -> str:
     }[ruta]
     return (
         f"Prepara únicamente la cotización de {servicio} solicitada por el usuario. "
-        "Ignora otras necesidades que aparezcan en el mensaje y usa tus herramientas "
-        "para calcular una propuesta si hay datos suficientes.\n\n"
+        "El mensaje puede contener otros servicios: ignóralos por completo. No los "
+        "menciones, no indiques que están fuera de tu alcance y no solicites datos "
+        "para ellos. Usa solo los datos pertinentes a tu especialidad y tus "
+        "herramientas para calcular una propuesta si hay información suficiente.\n\n"
         f"Mensaje original:\n{texto}"
     )
 
