@@ -67,6 +67,9 @@
     .motivo { color: var(--secundario); font-size: 11px; padding: 4px 0; }
     .escribiendo { color: var(--secundario); font-size: 13px; font-style: italic; }
     form { display: flex; gap: 10px; padding: 18px 22px; border-top: 1px solid var(--borde); background: #fbfcff; }
+    .acceso { display: flex; gap: 8px; padding: 11px 22px; background: #fbfcff; border-top: 1px solid var(--borde); }
+    .acceso input { padding: 8px 10px; font-size: 12px; }
+    .acceso span { color: var(--secundario); font-size: 12px; align-self: center; white-space: nowrap; }
     input { min-width: 0; flex: 1; padding: 13px 14px; border: 1px solid var(--borde); border-radius: 11px; outline: none; color: var(--texto); font: inherit; }
     input:focus { border-color: var(--primario); box-shadow: 0 0 0 3px rgba(49, 88, 215, .12); }
     button.enviar { border: 0; border-radius: 11px; padding: 0 18px; color: white; background: var(--primario); cursor: pointer; font-weight: 700; }
@@ -112,6 +115,10 @@
             <div class="burbuja">¡Hola! Cuéntame qué servicio TI necesitas cotizar. Puedo ayudarte con desarrollo de software, outsourcing TI y minería de datos.</div>
           </article>
         </div>
+        <div class="acceso">
+          <span>Token de acceso</span>
+          <input id="token" type="password" autocomplete="off" placeholder="Ingresa el token entregado por el equipo" required>
+        </div>
         <form id="formulario">
           <input id="texto" autocomplete="off" placeholder="Ej.: Necesito cotizar un portal web durante 3 meses" required>
           <button class="enviar" id="enviar" type="submit">Enviar</button>
@@ -124,6 +131,7 @@
     const formulario = document.querySelector("#formulario");
     const campoTexto = document.querySelector("#texto");
     const enviar = document.querySelector("#enviar");
+    const campoToken = document.querySelector("#token");
     const usuarioId = localStorage.getItem("cotizaciones_usuario") || crypto.randomUUID();
     localStorage.setItem("cotizaciones_usuario", usuarioId);
 
@@ -179,7 +187,10 @@
       try {
         const respuesta = await fetch("/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Token-Acceso": campoToken.value.trim()
+          },
           body: JSON.stringify({ user_id: usuarioId, texto })
         });
         const datos = await respuesta.json();

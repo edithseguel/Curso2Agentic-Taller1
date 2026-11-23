@@ -3,7 +3,6 @@
 import asyncio
 import os
 import re
-from collections.abc import Awaitable, Callable
 from operator import add
 from typing import Annotated, Literal
 from uuid import uuid4
@@ -16,10 +15,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
-from src.agente_Cristian_desarrollo_ti.graph import responder as responder_cristian
-from src.agente_Edith_outsourcing_ti.crew import responder as responder_edith
-from src.agente_Rodrigo_mineria_de_datos.graph import responder as responder_rodrigo
-
+from .cliente import consultar_agente
 from .prompts import (
     PROMPT_COORDINADOR,
     PROMPT_REFORMULADOR,
@@ -33,6 +29,17 @@ RUTA_CRISTIAN = "agente_Cristian_desarrollo_ti"
 RUTA_EDITH = "agente_Edith_outsourcing_ti"
 RUTA_RODRIGO = "agente_Rodrigo_mineria_de_datos"
 RUTA_GENERICA = "generica"
+URL_AGENTES = {
+    RUTA_CRISTIAN: os.getenv(
+        "URL_CRISTIAN_DESARROLLO_TI", os.getenv("URL_DESARROLLO", "http://127.0.0.1:8002")
+    ),
+    RUTA_EDITH: os.getenv(
+        "URL_EDITH_OUTSOURCING_TI", os.getenv("URL_OUTSOURCING", "http://127.0.0.1:8001")
+    ),
+    RUTA_RODRIGO: os.getenv(
+        "URL_RODRIGO_MINERIA_DE_DATOS", os.getenv("URL_MINERIA", "http://127.0.0.1:8003")
+    ),
+}
 
 
 class Decision(BaseModel):
@@ -255,18 +262,21 @@ def _solicitud_especializada(ruta: str, texto: str) -> str:
 
 async def _consultar_agente(
     ruta: str,
-    responder_agente: Callable[[str, str | None], Awaitable[str]],
     texto: str,
     config: RunnableConfig,
 ) -> dict[str, object]:
-    """Consulta un agente especializado y conserva un error legible si falla."""
-    context_id = config.get("configurable", {}).get("thread_id")
+    """Consulta por A2A HTTP y conserva un error legible si el agente falla."""
+    context_id = str(config.get("configurable", {}).get("thread_id") or uuid4())
     try:
-        respuesta = await responder_agente(_solicitud_especializada(ruta, texto), context_id)
+        respuesta = await consultar_agente(
+            URL_AGENTES[ruta], _solicitud_especializada(ruta, texto), context_id
+        )
+        if respuesta.startswith("El agente tardó demasiado"):
+            raise RuntimeError(respuesta)
         return _respuesta(ruta, respuesta)
     except Exception as error:
         mensaje = str(error).splitlines()[0] or "no se pudo generar la cotización"
-        return _respuesta(ruta, f"No se pudo generar la cotización solicitada: {mensaje}")
+        raise RuntimeError(f"Falló {ruta}: {mensaje}") from error
 
 
 async def agente_cristian(
@@ -274,7 +284,7 @@ async def agente_cristian(
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de desarrollo."""
     return await _consultar_agente(
-        RUTA_CRISTIAN, responder_cristian, _texto_consulta(estado), config
+        RUTA_CRISTIAN, _texto_consulta(estado), config
     )
 
 
@@ -282,7 +292,7 @@ async def agente_edith(
     estado: EstadoCoordinador, config: RunnableConfig
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de outsourcing."""
-    return await _consultar_agente(RUTA_EDITH, responder_edith, _texto_consulta(estado), config)
+    return await _consultar_agente(RUTA_EDITH, _texto_consulta(estado), config)
 
 
 async def agente_rodrigo(
@@ -290,7 +300,7 @@ async def agente_rodrigo(
 ) -> dict[str, object]:
     """Obtiene una propuesta del agente de cotizaciones de minería de datos."""
     return await _consultar_agente(
-        RUTA_RODRIGO, responder_rodrigo, _texto_consulta(estado), config
+        RUTA_RODRIGO, _texto_consulta(estado), config
     )
 
 

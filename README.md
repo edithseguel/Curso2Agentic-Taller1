@@ -7,7 +7,9 @@ consulta y la deriva al agente especializado:
 - **Cristian:** desarrollo de software.
 - **Rodrigo:** minería y análisis de datos.
 
-Además expone una API FastAPI con Swagger y una colección Bruno para probarla.
+Además expone una API FastAPI con interfaz web, Swagger y una colección Bruno
+para probarla. El coordinador consulta los tres especialistas mediante Agent
+Cards y A2A HTTP; por eso los agentes deben estar activos antes de cotizar.
 
 ## Requisitos y configuración
 
@@ -20,12 +22,18 @@ python -m pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Edita `.env` y completa `GOOGLE_API_KEY` y `MODELO`. Las horas y tarifas base
+Edita `.env` y completa `GOOGLE_API_KEY`, `MODELO` y un
+`TOKEN_ACCESO_CHAT` aleatorio. Las horas y tarifas base
 de cotización están definidas en los archivos `conocimiento.py` de cada
 agente. No subas `.env`: contiene secretos y está ignorado por Git.
 
 `.env.example` documenta todas las variables que usa el código: clave y modelo
 de Gemini, tarifas, URL de cada agente y URL del coordinador.
+
+`TOKEN_ACCESO_CHAT` se valida exclusivamente en el servidor para proteger
+`POST /chat`. No se debe guardar en el repositorio, en capturas ni en el código
+frontend. La interfaz web lo solicita para la sesión actual y lo envía en el
+header `X-Token-Acceso`.
 
 ## Correr el coordinador en local
 
@@ -75,8 +83,14 @@ Abre Swagger en <http://localhost:8000/docs>. Prueba una consulta con:
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
+  -H "X-Token-Acceso: $TOKEN_ACCESO_CHAT" \
   -d '{"user_id":"cliente-123","texto":"Necesito dos desarrolladores Python por seis meses."}'
 ```
+
+Una solicitud sin token o con token incorrecto devuelve `401`. Si el servidor
+no tiene configurado `TOKEN_ACCESO_CHAT`, devuelve `503` y no abre el chat.
+Si un agente A2A o el proveedor falla, el endpoint devuelve `502` con un
+mensaje seguro en una sola línea.
 
 La colección está en `bruno/`. Selecciona el entorno `Local` y modifica
 `base_url` para alternar entre el servidor local y Heroku.
@@ -88,6 +102,9 @@ Ejecuta las pruebas automatizadas con:
 ```bash
 python -m pytest
 ```
+
+Las pruebas cubren acceso autorizado/rechazado, ausencia de configuración,
+enrutamiento de uno/tres servicios y la delegación A2A HTTP.
 
 También puedes comprobar que la API está disponible:
 
@@ -134,7 +151,7 @@ git push https://git.heroku.com/cotizaciones-api-tu-identificador.git main
 Finalmente conecta la API con los tres agentes desplegados:
 
 ```bash
-heroku config:set URL_OUTSOURCING=https://cotizaciones-edith-tu-identificador.herokuapp.com URL_DESARROLLO=https://cotizaciones-cristian-tu-identificador.herokuapp.com URL_MINERIA=https://cotizaciones-rodrigo-tu-identificador.herokuapp.com -a cotizaciones-api-tu-identificador
+heroku config:set URL_OUTSOURCING=https://cotizaciones-edith-tu-identificador.herokuapp.com URL_DESARROLLO=https://cotizaciones-cristian-tu-identificador.herokuapp.com URL_MINERIA=https://cotizaciones-rodrigo-tu-identificador.herokuapp.com TOKEN_ACCESO_CHAT="TOKEN_LARGO_ALEATORIO" -a cotizaciones-api-tu-identificador
 ```
 
 Visita `https://cotizaciones-api-tu-identificador.herokuapp.com/docs`.
@@ -144,6 +161,9 @@ Visita `https://cotizaciones-api-tu-identificador.herokuapp.com/docs`.
 La API recibe los mensajes en `POST /telegram`, valida el secreto del webhook,
 los deriva al coordinador usando el `chat_id` como memoria de conversación y
 responde con la API HTTP de Telegram. No se usa ninguna librería de bot.
+Para limitar quién puede usar el bot, configura opcionalmente
+`TELEGRAM_ALLOWED_CHAT_IDS` con los identificadores autorizados separados por
+coma; un chat no incluido recibe `403`.
 
 1. Crea el bot con [@BotFather](https://t.me/BotFather), mediante `/newbot`,
    y copia el token. Elige también un secreto difícil de adivinar.

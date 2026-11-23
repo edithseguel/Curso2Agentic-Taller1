@@ -1,0 +1,13 @@
+INFO:     Started server process [86069]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60862 - "GET /.well-known/agent-card.json HTTP/1.1" 200 OK
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+INFO:     127.0.0.1:60862 - "POST / HTTP/1.1" 200 OK
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+WARNING:crewai.llms.base_llm:Using an approximate input token count for model 'gemini-3.5-flash-lite': assuming one token per four characters because a native token count is unavailable.
+INFO:     127.0.0.1:60930 - "POST / HTTP/1.1" 200 OK

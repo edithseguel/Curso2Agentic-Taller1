@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, Request, status
+from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, status
 from fastapi.responses import FileResponse, JSONResponse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -24,6 +24,12 @@ registro = logging.getLogger(__name__)
 MODELO = os.getenv("MODELO", "").strip()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "").strip()
 TELEGRAM_SECRET = os.getenv("TELEGRAM_SECRET", "").strip()
+TELEGRAM_ALLOWED_CHAT_IDS = {
+    valor.strip()
+    for valor in os.getenv("TELEGRAM_ALLOWED_CHAT_IDS", "").split(",")
+    if valor.strip()
+}
+TOKEN_ACCESO_CHAT = os.getenv("TOKEN_ACCESO_CHAT", "").strip()
 _TIEMPO_ESPERA_TELEGRAM = httpx.Timeout(30.0)
 RUTA_UI = Path(__file__).with_name("index.html")
 
@@ -159,7 +165,22 @@ async def inicio() -> FileResponse:
 @app.get("/health", tags=["agente_Cristian_desarrollo_ti"])
 async def health() -> dict[str, object]:
     """Informa que la API está disponible."""
-    return {"ok": True, "modelo": MODELO}
+    return {"ok": True, "modelo": MODELO, "chat_protegido": bool(TOKEN_ACCESO_CHAT)}
+
+
+def _validar_acceso_chat(token: str | None) -> None:
+    """Valida el token configurado exclusivamente en el servidor."""
+    if not TOKEN_ACCESO_CHAT:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El acceso al chat no está configurado en el servidor.",
+        )
+    if not token or not compare_digest(token, TOKEN_ACCESO_CHAT):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autorizado.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
 
 
 @app.post(
@@ -173,6 +194,8 @@ async def health() -> dict[str, object]:
     summary="Enviar una consulta al coordinador",
     responses={
         200: {"description": "Consulta procesada y derivada al agente correspondiente."},
+        401: {"model": ErrorResponse, "description": "Token ausente o inválido."},
+        503: {"model": ErrorResponse, "description": "Acceso no configurado en el servidor."},
         422: {"description": "El cuerpo no es válido; `texto` y `user_id` son obligatorios."},
         502: {
             "model": ErrorResponse,
@@ -180,8 +203,15 @@ async def health() -> dict[str, object]:
         },
     },
 )
-async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONResponse:
+async def chat(
+    solicitud: ChatRequest,
+    token_acceso: Annotated[
+        str | None,
+        Header(alias="X-Token-Acceso", description="Token de acceso al chat."),
+    ] = None,
+) -> ChatResponse | JSONResponse:
     """Ejecuta el grafo con el hilo asociado al usuario."""
+    _validar_acceso_chat(token_acceso)
     ruta = "desconocida"
     try:
         estado: dict[str, Any] = await ejecutar(solicitud.texto, solicitud.user_id)
@@ -258,5 +288,8 @@ async def telegram(
         return {"ok": True}
 
     chat_id = chat["id"]
+    if TELEGRAM_ALLOWED_CHAT_IDS and str(chat_id) not in TELEGRAM_ALLOWED_CHAT_IDS:
+        registro.warning("Telegram rechazado para chat_id no autorizado")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado.")
     tareas.add_task(_procesar_mensaje_telegram, chat_id, texto)
     return {"ok": True}

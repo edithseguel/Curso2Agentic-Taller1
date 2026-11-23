@@ -1,0 +1,17 @@
+LOCAL 2026-11-23 10:57:58 -03
+E1 rechazo sin token
+HTTP/1.1 401 Unauthorized
+date: Mon, 23 Nov 2026 13:57:58 GMT
+server: uvicorn
+www-authenticate: ApiKey
+content-length: 27
+content-type: application/json
+
+{"detail":"No autorizado."}\nE2 acceso autorizado y coordinación A2A de tres agentes
+HTTP/1.1 200 OK
+date: Mon, 23 Nov 2026 13:57:58 GMT
+server: uvicorn
+content-length: 1379
+content-type: application/json
+
+{"ruta":"agente_Cristian_desarrollo_ti, agente_Edith_outsourcing_ti, agente_Rodrigo_mineria_de_datos","motivo":"La solicitud combina necesidades de Cristian desarrollo ti, Edith outsourcing ti, Rodrigo mineria de datos.","consulta_reformulada":"Solicito una cotización para el desarrollo de un portal web, el servicio de outsourcing de 2 analistas QA por un plazo de 3 meses, y un servicio de análisis de incidentes.","respuesta":"Para el desarrollo del portal web, presento la siguiente propuesta base (plazo de 1 mes):\n\n* **Análisis:** 40 horas\n* **Desarrollo:** 120 horas\n* **Pruebas:** 40 horas\n* **Total horas:** 200 horas\n* **Tarifa:** 2 UF por hora\n* **Total estimado:** 400.00 UF\n\n*Nota: Toda cotización requiere validación humana antes de aprobarse o enviarse.*\n\n---\n\nCotización para 2 Analistas QA por 3 meses: Tarifa mensual de 450 UF por persona. Total del período: 2.700 UF. Toda cotización requiere validación humana antes de aprobarse o enviarse.\n\n---\n\nPropuesta base para minería de datos (plazo de 1 mes):\n\n* **Análisis de requisitos (32 horas):** 64 UF\n* **Recopilación y preprocesamiento (48 horas):** 96 UF\n* **Modelado (48 horas):** 96 UF\n* **Evaluación y conclusiones (32 horas):** 64 UF\n\n**Total estimado del período (1 mes):** 320 UF.\n\n*Toda cotización requiere validación humana antes de aprobarse o enviarse.*"}
