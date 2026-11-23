@@ -1,12 +1,11 @@
 """Base de conocimiento para cotizaciones de outsourcing TI."""
 
-HORAS_MENSUALES_REFERENCIA = 120
-TARIFAS_UF_HORA = {
-    "Analista de Sistemas/BI": 13.0,
-    "Analista QA/Testing": 12.0,
-    "Programador/Desarrollador": 13.0,
-    "Desarrollador Full Stack": 13.0,
-    "Desarrollador Java/.NET": 13.0,
-    "Administrador de Base de Datos (DBA)": 13.5,
-    "Otro perfil": 13.5,
+TARIFAS_MENSUALES_UF = {
+    "Analista de Sistemas/BI": 480.0,
+    "Analista QA/Testing": 450.0,
+    "Programador/Desarrollador": 480.0,
+    "Desarrollador Full Stack": 480.0,
+    "Desarrollador Java/.NET": 480.0,
+    "Administrador de Base de Datos (DBA)": 490.0,
+    "Otro perfil": 490.0,
 }

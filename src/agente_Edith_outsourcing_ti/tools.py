@@ -2,7 +2,7 @@
 
 from crewai.tools import tool
 
-from .conocimiento import HORAS_MENSUALES_REFERENCIA, TARIFAS_UF_HORA
+from .conocimiento import TARIFAS_MENSUALES_UF
 
 
 PERFILES = (
@@ -47,13 +47,11 @@ def cotizador(
     nombre_perfil = next(
         nombre for nombre in PERFILES if nombre.casefold() == perfil_limpio.casefold()
     )
-    valor_hora = TARIFAS_UF_HORA[nombre_perfil]
-    tarifa_mensual_calculada = valor_hora * HORAS_MENSUALES_REFERENCIA
+    tarifa_mensual_calculada = TARIFAS_MENSUALES_UF[nombre_perfil]
     subtotal = cantidad * tarifa_mensual_calculada
     total = subtotal * meses
     return (
         f"Cotización para {cantidad} persona(s) de {nombre_perfil} durante {meses} mes(es): "
-        f"valor hora {valor_hora:.2f} UF; tarifa mensual calculada "
-        f"({valor_hora:.2f} × {HORAS_MENSUALES_REFERENCIA}) {tarifa_mensual_calculada:.2f} UF; "
+        f"tarifa mensual referencial {tarifa_mensual_calculada:.2f} UF por persona; "
         f"subtotal mensual {subtotal:.2f} UF; total del período {total:.2f} UF."
     )
