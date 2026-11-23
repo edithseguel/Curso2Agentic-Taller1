@@ -72,6 +72,30 @@
     button.enviar { border: 0; border-radius: 11px; padding: 0 18px; color: white; background: var(--primario); cursor: pointer; font-weight: 700; }
     button.enviar:hover { background: var(--primario-oscuro); }
     button:disabled { opacity: .6; cursor: wait; }
+    .cuenta { display: flex; gap: 9px; align-items: center; }
+    .cuenta button, .gestion button {
+      border: 1px solid var(--borde); border-radius: 9px; background: white; color: var(--primario-oscuro);
+      padding: 8px 10px; cursor: pointer; font: inherit; font-size: 12px;
+    }
+    .acceso {
+      position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; padding: 18px;
+      background: rgba(16, 28, 54, .55); backdrop-filter: blur(5px);
+    }
+    .acceso[hidden], .gestion[hidden] { display: none; }
+    .tarjeta-acceso, .gestion {
+      width: min(420px, 100%); background: white; border-radius: 18px; padding: 27px; box-shadow: var(--sombra);
+    }
+    .tarjeta-acceso h2, .gestion h2 { margin: 0 0 7px; }
+    .tarjeta-acceso p { color: var(--secundario); font-size: 13px; line-height: 1.5; }
+    .campos { display: grid; gap: 11px; margin-top: 20px; }
+    .campos label { display: grid; gap: 5px; font-size: 12px; color: var(--secundario); }
+    .campos input { width: 100%; }
+    .campos button { padding: 12px; border: 0; border-radius: 10px; background: var(--primario); color: white; font-weight: 700; cursor: pointer; }
+    .error { min-height: 18px; margin: 10px 0 0; color: #c1374c; font-size: 12px; }
+    .gestion { position: fixed; inset: 80px 18px auto auto; z-index: 3; border: 1px solid var(--borde); }
+    .gestion .cerrar { float: right; border: 0; font-size: 18px; }
+    #lista-usuarios { margin: 16px 0 0; padding: 0; list-style: none; max-height: 150px; overflow: auto; }
+    #lista-usuarios li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--borde); font-size: 12px; }
     @media (max-width: 760px) {
       header { padding: 18px 0; } .estado { display: none; } .panel { grid-template-columns: 1fr; min-height: 680px; }
       aside { display: none; } #mensajes { padding: 18px; } form { padding: 14px; } .mensaje { max-width: 97%; }
@@ -85,7 +109,11 @@
         <div class="icono">✦</div>
         <div><h1>Cotizaciones TI</h1><p>Asistente coordinador de propuestas</p></div>
       </div>
-      <div class="estado"><span class="punto">●</span> Coordinador disponible</div>
+      <div class="cuenta">
+        <div class="estado"><span class="punto">●</span> <span id="estado-usuario">Conectando…</span></div>
+        <button id="boton-supervisor" hidden>Administrar usuarios</button>
+        <button id="boton-salir" hidden>Salir</button>
+      </div>
     </header>
     <main class="panel">
       <aside>
@@ -118,6 +146,31 @@
       </section>
     </main>
   </div>
+  <section class="acceso" id="acceso">
+    <form class="tarjeta-acceso" id="formulario-login">
+      <div class="icono">✦</div>
+      <h2>Acceso autorizado</h2>
+      <p>Ingresa con tu usuario y clave para utilizar el coordinador de cotizaciones.</p>
+      <div class="campos">
+        <label>Usuario<input id="usuario-login" autocomplete="username" required minlength="3"></label>
+        <label>Clave de acceso<input id="clave-login" type="password" autocomplete="current-password" required minlength="8"></label>
+        <button type="submit">Iniciar sesión</button>
+      </div>
+      <p class="error" id="error-login"></p>
+    </form>
+  </section>
+  <section class="gestion" id="gestion" hidden>
+    <button class="cerrar" id="cerrar-gestion" aria-label="Cerrar">×</button>
+    <h2>Usuarios externos</h2>
+    <p>El supervisor puede crear accesos para clientes o colaboradores.</p>
+    <form class="campos" id="formulario-usuario">
+      <label>Usuario externo<input id="usuario-nuevo" required minlength="3"></label>
+      <label>Clave temporal<input id="clave-nueva" type="password" required minlength="8"></label>
+      <button type="submit">Crear usuario</button>
+    </form>
+    <p class="error" id="error-usuario"></p>
+    <ul id="lista-usuarios"></ul>
+  </section>
   <script>
     const mensajes = document.querySelector("#mensajes");
     const formulario = document.querySelector("#formulario");
@@ -125,6 +178,33 @@
     const enviar = document.querySelector("#enviar");
     const usuarioId = localStorage.getItem("cotizaciones_usuario") || crypto.randomUUID();
     localStorage.setItem("cotizaciones_usuario", usuarioId);
+    let sesion = null;
+
+    function actualizarSesion(datos) {
+      sesion = datos;
+      document.querySelector("#acceso").hidden = true;
+      document.querySelector("#estado-usuario").textContent = `${datos.usuario} · ${datos.rol}`;
+      document.querySelector("#boton-salir").hidden = false;
+      document.querySelector("#boton-supervisor").hidden = datos.rol !== "supervisor";
+    }
+
+    async function cargarUsuarios() {
+      const respuesta = await fetch("/api/usuarios");
+      if (!respuesta.ok) return;
+      const usuarios = await respuesta.json();
+      document.querySelector("#lista-usuarios").innerHTML = usuarios.map((usuario) =>
+        `<li><span>${usuario.usuario}</span><span>${usuario.rol}</span></li>`
+      ).join("");
+    }
+
+    async function revisarSesion() {
+      const respuesta = await fetch("/api/sesion");
+      if (respuesta.ok) actualizarSesion(await respuesta.json());
+      else {
+        document.querySelector("#acceso").hidden = false;
+        document.querySelector("#estado-usuario").textContent = "Acceso requerido";
+      }
+    }
 
     function agregarMensaje(texto, tipo, datos = null) {
       const articulo = document.createElement("article");
@@ -191,6 +271,53 @@
         campoTexto.focus();
       }
     });
+
+    document.querySelector("#formulario-login").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const error = document.querySelector("#error-login");
+      error.textContent = "";
+      const respuesta = await fetch("/api/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usuario: document.querySelector("#usuario-login").value,
+          clave: document.querySelector("#clave-login").value
+        })
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) { error.textContent = datos.detail || "No se pudo iniciar sesión."; return; }
+      actualizarSesion(datos);
+    });
+
+    document.querySelector("#boton-salir").addEventListener("click", async () => {
+      await fetch("/api/logout", { method: "POST" });
+      location.reload();
+    });
+
+    document.querySelector("#boton-supervisor").addEventListener("click", async () => {
+      document.querySelector("#gestion").hidden = false;
+      await cargarUsuarios();
+    });
+    document.querySelector("#cerrar-gestion").addEventListener("click", () => {
+      document.querySelector("#gestion").hidden = true;
+    });
+    document.querySelector("#formulario-usuario").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const error = document.querySelector("#error-usuario");
+      error.textContent = "";
+      const respuesta = await fetch("/api/usuarios", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usuario: document.querySelector("#usuario-nuevo").value,
+          clave: document.querySelector("#clave-nueva").value
+        })
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) { error.textContent = datos.detail || "No se pudo crear el usuario."; return; }
+      document.querySelector("#formulario-usuario").reset();
+      await cargarUsuarios();
+    });
+
+    revisarSesion();
   </script>
 </body>
 </html>

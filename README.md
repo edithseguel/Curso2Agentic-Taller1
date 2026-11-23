@@ -24,6 +24,18 @@ Edita `.env` y completa `GOOGLE_API_KEY` y `MODELO`. Las horas y tarifas base
 de cotización están definidas en los archivos `conocimiento.py` de cada
 agente. No subas `.env`: contiene secretos y está ignorado por Git.
 
+### Acceso de usuarios
+
+La interfaz requiere una sesión autorizada. Define `SUPERVISOR_USUARIO` y
+`SUPERVISOR_CLAVE` antes de iniciar la API; en el primer arranque se crea ese
+supervisor. Desde **Administrar usuarios**, el supervisor puede crear usuarios
+externos con una clave de acceso.
+
+La base SQLite se guarda en `data/usuarios.sqlite3` y está excluida de Git.
+En Heroku el disco es efímero: los usuarios creados se pierden si el dyno se
+recrea. Para producción se debe configurar una base persistente, como Heroku
+Postgres.
+
 `.env.example` documenta todas las variables que usa el código: clave y modelo
 de Gemini, tarifas, URL de cada agente y URL del coordinador.
 

@@ -8,11 +8,30 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Body, FastAPI, Header, HTTPException, Request, status
+from fastapi import (
+    BackgroundTasks,
+    Body,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import FileResponse, JSONResponse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.seguridad import (
+    autenticar,
+    cerrar_sesion,
+    crear_sesion,
+    crear_usuario_externo,
+    listar_usuarios,
+    preparar_usuarios,
+    sesion_actual,
+)
 from src.coordinador.graph import (
     ejecutar,
     graph,
@@ -106,9 +125,21 @@ class ErrorResponse(BaseModel):
     ]
 
 
+class LoginRequest(BaseModel):
+    """Credenciales de inicio de sesión."""
+
+    usuario: Annotated[str, Field(min_length=3, max_length=60)]
+    clave: Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class UsuarioExternoRequest(LoginRequest):
+    """Datos para crear un usuario externo."""
+
+
 @asynccontextmanager
 async def ciclo_vida(app: FastAPI):
     """Conserva el grafo compilado durante toda la vida de la aplicación."""
+    preparar_usuarios()
     app.state.grafo_coordinador = graph
     yield
 
@@ -148,6 +179,68 @@ async def inicio() -> FileResponse:
     return FileResponse(RUTA_UI)
 
 
+def _cookie_segura(request: Request) -> bool:
+    """Activa la marca Secure cuando la solicitud llegó mediante HTTPS."""
+    return (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto", "").casefold() == "https"
+    )
+
+
+@app.post("/api/login", include_in_schema=False)
+async def login(datos: LoginRequest, request: Request, response: Response) -> dict[str, str]:
+    """Inicia sesión de un usuario autorizado."""
+    resultado = autenticar(datos.usuario.strip(), datos.clave)
+    if resultado is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas.")
+    usuario, rol = resultado
+    response.set_cookie(
+        "sesion_cotizaciones",
+        crear_sesion(usuario, rol),
+        httponly=True,
+        samesite="lax",
+        secure=_cookie_segura(request),
+        max_age=8 * 60 * 60,
+    )
+    return {"usuario": usuario, "rol": rol}
+
+
+@app.post("/api/logout", include_in_schema=False)
+async def logout(request: Request, response: Response) -> dict[str, bool]:
+    """Cierra la sesión actual."""
+    cerrar_sesion(request.cookies.get("sesion_cotizaciones"))
+    response.delete_cookie("sesion_cotizaciones")
+    return {"ok": True}
+
+
+@app.get("/api/sesion", include_in_schema=False)
+async def obtener_sesion(sesion: tuple[str, str] = Depends(sesion_actual)) -> dict[str, str]:
+    """Devuelve los datos seguros de la sesión activa."""
+    return {"usuario": sesion[0], "rol": sesion[1]}
+
+
+@app.get("/api/usuarios", include_in_schema=False)
+async def usuarios(sesion: tuple[str, str] = Depends(sesion_actual)) -> list[dict[str, str | bool]]:
+    """Lista usuarios; disponible solo para el supervisor."""
+    if sesion[1] != "supervisor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso exclusivo del supervisor.")
+    return listar_usuarios()
+
+
+@app.post("/api/usuarios", include_in_schema=False)
+async def crear_usuario(
+    datos: UsuarioExternoRequest, sesion: tuple[str, str] = Depends(sesion_actual)
+) -> dict[str, bool]:
+    """Crea un usuario externo; disponible solo para el supervisor."""
+    if sesion[1] != "supervisor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso exclusivo del supervisor.")
+    try:
+        crear_usuario_externo(datos.usuario.strip(), datos.clave)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return {"ok": True}
+
+
 @app.get("/health", tags=["agente_Cristian_desarrollo_ti"])
 async def health() -> dict[str, object]:
     """Informa que la API está disponible."""
@@ -172,7 +265,11 @@ async def health() -> dict[str, object]:
         },
     },
 )
-async def chat(solicitud: ChatRequest, request: Request) -> ChatResponse | JSONResponse:
+async def chat(
+    solicitud: ChatRequest,
+    request: Request,
+    sesion: tuple[str, str] = Depends(sesion_actual),
+) -> ChatResponse | JSONResponse:
     """Ejecuta el grafo con el hilo asociado al usuario."""
     ruta = "desconocida"
     try:
