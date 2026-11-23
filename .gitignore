@@ -26,3 +26,6 @@ datos/
 .DS_Store
 .idea/
 .vscode/
+
+# Archivos temporales de Microsoft Word
+~$*.docx

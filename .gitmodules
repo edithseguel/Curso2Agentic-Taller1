@@ -1,0 +1,9 @@
+[submodule "Curso2Agentic-Agente-Edith"]
+	path = Curso2Agentic-Agente-Edith
+	url = https://github.com/edithseguel/Curso2Agentic-Agente-Edith.git
+[submodule "Curso2Agentic-Agente-Cristian"]
+	path = Curso2Agentic-Agente-Cristian
+	url = https://github.com/edithseguel/Curso2Agentic-Agente-Cristian.git
+[submodule "Curso2Agentic-Agente-Rodrigo"]
+	path = Curso2Agentic-Agente-Rodrigo
+	url = https://github.com/edithseguel/Curso2Agentic-Agente-Rodrigo.git
